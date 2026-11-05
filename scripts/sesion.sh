@@ -12,6 +12,13 @@ TUNNEL_LOG="$LOG_DIR/tunnel.log"
 command -v cloudflared >/dev/null || { echo "Falta cloudflared (instálalo: sudo pacman -S cloudflared)"; exit 1; }
 [ -d node_modules ] || npm install
 
+# ¿Ya hay algo escuchando en el puerto? (otra sesión abierta)
+if ss -ltn "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then
+  echo "  ✖ El puerto $PORT ya está en uso (¿otra sesión abierta?)."
+  echo "    Ciérrala con Ctrl+C en su terminal, o: kill \$(lsof -t -i :$PORT)   ·   o usa otro: PORT=3001 npm run sesion"
+  exit 1
+fi
+
 cleanup() {
   [ -n "${TUNNEL_PID:-}" ] && kill "$TUNNEL_PID" 2>/dev/null || true
   [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null || true

@@ -53,7 +53,23 @@ server.listen(PORT, HOST, () => {
   }
 });
 
-process.on('uncaughtException', (err) => log.error('excepción no capturada', { error: err.message, stack: err.stack }));
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    log.error('puerto ocupado', { port: PORT });
+    console.error(`\n  ✖ El puerto ${PORT} ya está en uso: probablemente ya hay un servidor de DungeonDumbtastic abierto.`);
+    console.error(`    Ciérralo (Ctrl+C en su terminal, o: kill $(lsof -t -i :${PORT})) o usa otro puerto: PORT=3001 npm start\n`);
+  } else {
+    log.error('no se pudo abrir el servidor', { error: err.message });
+  }
+  process.exit(1);
+});
+
+// Tras una excepción no capturada el proceso queda en estado incierto: se registra y se sale.
+process.on('uncaughtException', (err) => {
+  log.error('excepción no capturada', { error: err.message, stack: err.stack });
+  try { flush(); } catch { /* ya estamos saliendo */ }
+  process.exit(1);
+});
 process.on('unhandledRejection', (err) => log.error('promesa rechazada sin manejar', { error: String(err?.message || err) }));
 
 function shutdown(signal) {

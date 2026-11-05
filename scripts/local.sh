@@ -6,6 +6,13 @@ cd "$(dirname "$0")/.."
 PORT="${PORT:-3000}"
 [ -d node_modules ] || npm install
 
+# ¿Ya hay algo escuchando en el puerto? (otra sesión abierta)
+if ss -ltn "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then
+  echo "  ✖ El puerto $PORT ya está en uso (¿otra sesión abierta?)."
+  echo "    Ciérrala con Ctrl+C en su terminal, o: kill \$(lsof -t -i :$PORT)   ·   o usa otro: PORT=3001 npm run local"
+  exit 1
+fi
+
 # IPs de la red local (se ignoran loopback y docker)
 IPS="$(ip -4 -o addr show 2>/dev/null | awk '$2 !~ /^(lo|docker|br-|veth|virbr)/ {split($4, a, "/"); print a[1]}')"
 
