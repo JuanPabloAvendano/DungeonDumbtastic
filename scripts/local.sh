@@ -29,6 +29,11 @@ fi
 echo ""
 echo "  Hotspot del celular: activa el punto de acceso, conecta este PC y los demás dispositivos"
 echo "  a esa red y abrid la dirección de arriba. Si no carga, revisa el cortafuegos (puerto $PORT)."
+if systemctl is-active --quiet ufw 2>/dev/null; then
+  echo ""
+  echo "  🛡 ufw está activo: si los otros dispositivos ven «timeout», abre el puerto una vez con:"
+  echo "     sudo ufw allow $PORT/tcp"
+fi
 if command -v qrencode >/dev/null && [ -n "$IPS" ]; then
   echo ""
   qrencode -t ANSIUTF8 "http://$(echo "$IPS" | head -1):$PORT"
