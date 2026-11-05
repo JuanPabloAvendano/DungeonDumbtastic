@@ -1,0 +1,3 @@
+/* Fuentes servidas desde el propio servidor para que funcione sin internet (modo hotspot). SIL OFL 1.1. */
+@font-face { font-family: 'Cinzel'; font-style: normal; font-weight: 400 900; font-display: swap; src: url('/fonts/cinzel.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('/fonts/inter.woff2') format('woff2'); }

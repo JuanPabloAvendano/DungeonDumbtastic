@@ -1,0 +1,26 @@
+{
+  "name": "dungeon-dumbtastic",
+  "version": "1.0.0",
+  "description": "Mesa virtual en el navegador para jugar rol con amigos",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "sesion": "bash scripts/sesion.sh",
+    "test": "node --test test/",
+    "demo": "node scripts/demo.js",
+    "local": "bash scripts/local.sh",
+    "bot": "node scripts/bot.js"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.22.3",
+    "multer": "^2.5.0",
+    "socket.io": "^4.8.4",
+    "three": "^0.170.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
+  }
+}
