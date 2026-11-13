@@ -112,3 +112,27 @@ sesiones. Aún no se hace. Pendiente de investigar: servidor barato, sin arquite
   cubre un VPS de 4 €.
 - Fuentes: comparativas de precios de 2026 (blogs de terceros, con datos dispares): bitdoze.com/hetzner-cloud-cost-optimized-plans,
   deploywise.dev/blog/cheap-vps-for-developers, tech-insider.org/cloudflare-tunnel-setup-2026-homelab.
+
+### Persistencia en la nube: lo que queda · 2026-11-13
+Decidido: un solo contenedor y nada más en la nube (proyecto pequeño, para Juan y sus amigos). Ya hecho:
+SQLite dentro del contenedor (`data/db.sqlite`), el PC baja un respaldo cada 10 min (`npm run respaldo --
+--instalar`) y `npm run nube` redespliega con esos datos. Si el contenedor se reinicia solo, vuelve a lo último desplegado:
+el respaldo lo detecta, avisa y guarda el último bueno; hay que correr `npm run nube` a mano para volver a
+subirlo (se pierde como mucho lo jugado en los últimos 10 min).
+
+### Documentos propios de cada usuario · 2026-11-13
+Que cualquier usuario suba sus documentos (PDF, notas, manuales caseros) y los use: para sí mismo de forma
+constante (su biblioteca personal) y, si es DM, compartiéndolos en su campaña con sus jugadores. Pensar
+permisos (privado / campaña / jugadores concretos), búsqueda dentro de ellos como en el compendio y dónde
+se guardan en la nube (ligado a «Persistencia de verdad en la nube»).
+
+### Personalización y creación de objetos más dinámica · 2026-11-13
+Crear y personalizar objetos de forma más flexible que la biblioteca de ejemplos actual: editor con
+propiedades libres, imagen propia, efectos y plantillas reutilizables (ver también «Objetos del mapa: lo que queda»).
+
+### Conexión P2P y alternativas de túnel · 2026-11-13
+Hoy, si Cloudflare cae, no hay cómo jugar fuera de la LAN sin desplegar en la nube. Opciones a evaluar:
+- Conexión P2P entre navegadores (WebRTC) para jugar sin servidor público.
+- Varios proveedores de túnel intercambiables, como Cloudflare Tunnel: ngrok, Tailscale Funnel,
+  localtunnel, Pinggy, zrok, bore… con un comando que pruebe el siguiente si uno falla.
+La parte de red y hosting la decide Juan.

@@ -10,7 +10,9 @@
     "demo": "node scripts/demo.js",
     "local": "bash scripts/local.sh",
     "bot": "node scripts/bot.js",
-    "compendio": "node scripts/compendio.js"
+    "compendio": "node scripts/compendio.js",
+    "respaldo": "bash scripts/respaldo.sh",
+    "nube": "bash scripts/nube.sh"
   },
   "license": "ISC",
   "type": "commonjs",

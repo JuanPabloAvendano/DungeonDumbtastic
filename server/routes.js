@@ -14,6 +14,7 @@ const { registerStudio } = require('./routes-studio');
 const { registerCompendium } = require('./routes-compendium');
 const { registerNotes } = require('./notes');
 const objects = require('./objects');
+const { registerBackup } = require('./backup');
 
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
@@ -158,6 +159,8 @@ function buildRouter(io) {
     save();
     return { settings: db().settings };
   }));
+
+  registerBackup(r, admin);
 
   r.get('/admin/campaigns', admin, handle(() => ({
     campaigns: db().campaigns.map((c) => ({

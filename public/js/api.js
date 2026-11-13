@@ -67,6 +67,23 @@ export const api = {
     setToken(data.token);
     return data.user;
   },
+  /** Descarga un archivo de la API (con la sesión) y lo guarda con el nombre que manda el servidor. */
+  async download(url, fallbackName) {
+    let res;
+    try {
+      res = await fetch(`/api${url}`, { headers: { Authorization: `Bearer ${getToken() || ''}` } });
+    } catch {
+      throw new Error('No hay conexión con el servidor');
+    }
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Error ${res.status}`);
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || fallbackName;
+    const href = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement('a'), { href, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+  },
   async logout() {
     await request('POST', '/auth/logout').catch(() => {});
     setToken(null);

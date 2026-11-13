@@ -1,0 +1,9 @@
+node_modules
+.git
+data/traductor
+data/logs
+data/db.backup-*
+*.log
+respaldos
+data/db.sqlite-wal
+data/db.sqlite-shm

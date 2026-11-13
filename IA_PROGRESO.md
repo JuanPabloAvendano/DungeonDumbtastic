@@ -79,10 +79,15 @@ Tarea actual: T-3.3
 - [x] T-7.3 · Logs diarios, monitor en el panel de admin y /healthz · peso 2
 - [ ] T-7.4 · Enlace fijo (túnel con cuenta de Cloudflare) · peso 1
 - [ ] T-7.5 · Copias de seguridad automáticas de data/ · peso 2
+  - [x] Base en SQLite (node:sqlite) con migración automática desde db.json
+  - [x] Respaldo del super admin (endpoint + botón) con instantánea consistente
+  - [x] npm run respaldo: timer de 10 min, retención y aviso si la nube se reinició
+  - [x] npm run nube: redesplegar en Azure sin perder lo jugado
+  - [ ] Versión con SQLite desplegada en Azure y timer instalado en el PC de Juan
 
 ## H8 · Documentación y pruebas · peso 10
 - [x] T-8.1 · Guías en la app: general, jugador y DM · peso 3
-- [x] T-8.2 · Pruebas unitarias y de integración (48 en verde) · peso 3
+- [x] T-8.2 · Pruebas unitarias y de integración (55 en verde) · peso 3
 - [x] T-8.3 · CLI de juego (scripts/bot.js) y partida de prueba con agentes · peso 2
 - [ ] T-8.4 · Primera sesión real con el grupo y lista de mejoras · peso 2
 

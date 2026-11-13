@@ -127,6 +127,16 @@ export async function adminView(root, { me, header }) {
         }, field('Usuario', nu.username), field('Nombre visible', nu.displayName), field('Contraseña', nu.password), field('Rol', nu.role),
         h('button.btn.primary', 'Crear')),
         h('label.check', regToggle, h('span', 'Permitir que cualquiera cree su cuenta de jugador desde la pantalla de acceso'))),
+      h('section.panel-card', h('h2.section-title', 'Respaldo'),
+        h('p.muted', 'Baja todo (cuentas, campañas, mapas, subidas y compendio) en un .tar.gz. En la nube lo que no se respalde se pierde al reiniciar.'),
+        h('button.btn.primary', {
+          onclick: async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            try { await api.download('/admin/backup', 'dungeondumbtastic-respaldo.tar.gz'); toast('Respaldo descargado', 'ok'); } catch (err) { toast(err.message, 'error'); }
+            btn.disabled = false;
+          },
+        }, 'Descargar respaldo')),
       h('section.panel-card', h('h2.section-title', 'Monitor del servidor'), monitorBox),
       h('section.panel-card', h('h2.section-title', 'Cuentas'), usersBox),
       h('section.panel-card', h('h2.section-title', 'Campañas'), campsBox))));
