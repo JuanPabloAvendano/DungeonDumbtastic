@@ -9,7 +9,8 @@
     "test": "node --test test/",
     "demo": "node scripts/demo.js",
     "local": "bash scripts/local.sh",
-    "bot": "node scripts/bot.js"
+    "bot": "node scripts/bot.js",
+    "compendio": "node scripts/compendio.js"
   },
   "license": "ISC",
   "type": "commonjs",

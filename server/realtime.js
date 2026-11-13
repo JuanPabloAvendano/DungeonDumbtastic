@@ -1,38 +1,17 @@
-// Tiempo real con socket.io: tablero, fichas, escena, iniciativa, chat y tiradas.
+// Tiempo real con socket.io: conexión, presencia, música, chat y tiradas. El tablero va en realtime-board.js.
 const crypto = require('crypto');
 const { db, save } = require('./db');
 const auth = require('./auth');
 const camp = require('./campaigns');
 const dice = require('./dice');
+const sc = require('./scenes');
 const { log, countEvent } = require('./logger');
+const { registerBoard, uniqueName, withoutEntry, safeUrl } = require('./realtime-board');
+const { registerObjects } = require('./realtime-objects');
 
-const TOKEN_LIMIT = 200;
-const MAP_LIMIT = 60;
 const TRACK_LIMIT = 80;
 const TRACK_KINDS = ['musica', 'ambiente', 'efecto'];
-const URL_RE = /^\/(uploads|assets)\/[\w./-]+$/;
-
-function safeUrl(v) {
-  return typeof v === 'string' && URL_RE.test(v) && !v.includes('..') ? v : null;
-}
-
-/** "Goblin", "Goblin 2", "Goblin 3"… para poder distinguir fichas repetidas. */
-function uniqueName(tokens, base) {
-  const taken = new Set(tokens.map((t) => t.name));
-  if (!taken.has(base)) return base;
-  let n = 2;
-  while (taken.has(`${base} ${n}`)) n += 1;
-  return `${base} ${n}`;
-}
-
-/** Quita una entrada de la iniciativa manteniendo el turno en quien estaba actuando. */
-function withoutEntry(ini, tokenId) {
-  const idx = ini.entries.findIndex((e) => e.tokenId === tokenId);
-  if (idx === -1) return ini;
-  const entries = ini.entries.filter((_, i) => i !== idx);
-  const turn = idx < ini.turn ? ini.turn - 1 : ini.turn;
-  return { ...ini, entries, turn: Math.max(0, Math.min(turn, entries.length - 1)) };
-}
+const REQUEST_TTL_MS = 10 * 60 * 1000;
 
 function setupRealtime(io) {
   // Quién está conectado en cada campaña: campaignId -> Map(socketId -> userId)
@@ -61,21 +40,55 @@ function setupRealtime(io) {
     for (const s of io.sockets.adapter.rooms.get(campaign.id) || []) {
       const sock = io.sockets.sockets.get(s);
       const user = sock && db().users.find((u) => u.id === sock.data.userId);
-      if (user) sock.emit(event, build(user));
+      const payload = user && build(user, sock);
+      if (payload !== undefined) sock.emit(event, payload);
     }
   }
 
-  function emitTokens(campaign) {
-    emitPerViewer(campaign, 'tokens', (u) => (camp.isDM(u, campaign) ? campaign.tokens : campaign.tokens.filter((t) => !t.hidden)));
+  const sceneIdOf = (user, c, sock) => camp.viewedScene(user, c, sock.data.viewSceneId).id;
+
+  /** Manda la escena a quien la está mirando (jugadores asignados y DMs que la tengan abierta). */
+  function emitScene(c, scene) {
+    emitPerViewer(c, 'scene:state', (u, sock) => (sceneIdOf(u, c, sock) === scene.id ? camp.sceneView(u, c, scene) : undefined));
+  }
+
+  function emitToScene(c, scene, event, payload, exceptSocketId) {
+    emitPerViewer(c, event, (u, sock) => (sock.id !== exceptSocketId && sceneIdOf(u, c, sock) === scene.id ? payload : undefined));
+  }
+
+  /** Resumen de escenas (dónde está cada jugador) solo para el DM. */
+  function emitScenes(c) {
+    emitPerViewer(c, 'scenes', (u) => (camp.isDM(u, c) ? { scenes: sc.summary(c), activeSceneId: c.activeSceneId } : undefined));
+  }
+
+  /** Tras lanzar una escena: a cada jugador que cambió de escena se le manda la nueva con su cartel. */
+  function emitPlayersMoved(c, before) {
+    emitPerViewer(c, 'scene:state', (u, sock) => {
+      if (camp.isDM(u, c)) return undefined;
+      const sid = sceneIdOf(u, c, sock);
+      if (before[u.id] === sid) return undefined;
+      return { ...camp.sceneView(u, c, sc.findScene(c, sid)), arrived: true };
+    });
+  }
+
+  /** Cada uno recibe su lista de personajes (los jugadores no ven la hoja de los NPC). */
+  function emitCharacters(c) {
+    emitPerViewer(c, 'characters', (u) => camp.charactersFor(u, c));
   }
 
   function emitLog(campaign, entry) {
     emitPerViewer(campaign, 'log', (u) => (camp.logVisibleTo(u, campaign, entry) ? entry : null));
   }
 
+  // Peticiones de tirada del DM aún sin contestar: id -> { userIds, at }. Permiten tirar fuera de turno.
+  const pending = new Map();
+
   io.on('connection', (socket) => {
+    // Sala personal: avisos del lobby (te añaden a una campaña, cambian tus personajes…).
+    socket.join(`user:${socket.data.userId}`);
     const me = () => db().users.find((u) => u.id === socket.data.userId);
     let campaignId = null;
+    const myScene = (c, user) => camp.viewedScene(user, c, socket.data.viewSceneId);
 
     /** Ejecuta un handler con la campaña actual; avisa al cliente si falla. */
     const on = (event, { dmOnly = false } = {}, fn) => {
@@ -86,8 +99,8 @@ function setupRealtime(io) {
           const c = campaignId && camp.findCampaign(campaignId);
           if (!user || !c || !camp.canAccess(user, c)) throw new Error('No estás en una campaña');
           if (dmOnly && !camp.isDM(user, c)) throw new Error('Solo el DM puede hacer esto');
-          fn(c, user, payload);
-          if (typeof ack === 'function') ack({ ok: true });
+          const out = fn(c, user, payload);
+          if (typeof ack === 'function') ack({ ok: true, ...(out || {}) });
         } catch (err) {
           log.warn('evento rechazado', { event, user: me()?.username, error: err.message });
           if (typeof ack === 'function') ack({ error: err.message });
@@ -102,12 +115,13 @@ function setupRealtime(io) {
       if (!user || !c || !camp.canAccess(user, c)) return ack?.({ error: 'Campaña no encontrada' });
       if (campaignId) leave();
       campaignId = c.id;
+      socket.data.viewSceneId = c.activeSceneId;
       socket.join(c.id);
       if (!presence.has(c.id)) presence.set(c.id, new Map());
       presence.get(c.id).set(socket.id, user.id);
       io.to(c.id).emit('presence', onlineIds(c.id));
       log.info('entra a la mesa', { user: user.username, campaign: c.name, ip: socket.handshake.address });
-      ack?.({ state: camp.viewFor(user, c), online: onlineIds(c.id), serverNow: Date.now() });
+      ack?.({ state: camp.viewFor(user, c, socket.data.viewSceneId), online: onlineIds(c.id), serverNow: Date.now() });
     });
 
     function leave() {
@@ -124,131 +138,11 @@ function setupRealtime(io) {
     socket.on('refresh', (_, ack) => {
       const user = me();
       const c = campaignId && camp.findCampaign(campaignId);
-      if (user && c && camp.canAccess(user, c)) ack?.({ state: camp.viewFor(user, c), online: onlineIds(c.id), serverNow: Date.now() });
+      if (user && c && camp.canAccess(user, c)) ack?.({ state: camp.viewFor(user, c, socket.data.viewSceneId), online: onlineIds(c.id), serverNow: Date.now() });
     });
 
-    // ---------- mapas y escena (DM) ----------
-    on('map:add', { dmOnly: true }, (c, user, { name, url }) => {
-      const clean = safeUrl(url);
-      if (!clean) throw new Error('Imagen inválida');
-      if (c.maps.length >= MAP_LIMIT) throw new Error('Demasiados mapas');
-      const map = { id: crypto.randomUUID(), name: camp.cleanText(name, 50, 'Mapa').trim() || 'Mapa', url: clean };
-      c.maps = [...c.maps, map];
-      if (!c.scene.mapId) c.scene = { ...c.scene, mapId: map.id };
-      save();
-      io.to(c.id).emit('maps', c.maps);
-      io.to(c.id).emit('scene', c.scene);
-    });
-
-    on('map:remove', { dmOnly: true }, (c, user, { id }) => {
-      c.maps = c.maps.filter((m) => m.id !== id);
-      if (c.scene.mapId === id) c.scene = { ...c.scene, mapId: c.maps[0]?.id || null };
-      save();
-      io.to(c.id).emit('maps', c.maps);
-      io.to(c.id).emit('scene', c.scene);
-    });
-
-    on('scene:set', { dmOnly: true }, (c, user, p) => {
-      c.scene = {
-        mapId: p.mapId !== undefined && (p.mapId === null || c.maps.some((m) => m.id === p.mapId)) ? p.mapId : c.scene.mapId,
-        gridSize: p.gridSize !== undefined ? camp.clampInt(p.gridSize, 20, 300, c.scene.gridSize) : c.scene.gridSize,
-        showGrid: typeof p.showGrid === 'boolean' ? p.showGrid : c.scene.showGrid,
-      };
-      save();
-      io.to(c.id).emit('scene', c.scene);
-    });
-
-    // ---------- fichas ----------
-    on('token:add', {}, (c, user, p) => {
-      const dm = camp.isDM(user, c);
-      const character = p.characterId && db().characters.find((ch) => ch.id === p.characterId && ch.campaignId === c.id);
-      if (!dm && (!character || character.ownerId !== user.id)) throw new Error('Solo puedes colocar tu propio personaje');
-      if (c.tokens.length >= TOKEN_LIMIT) throw new Error('Demasiadas fichas en el tablero');
-      const img = safeUrl(p.img) || safeUrl(character?.portrait) || '/assets/demo/token-goblin.svg';
-      const baseName = camp.cleanText(p.name, 40, character?.name || 'Ficha').trim() || 'Ficha';
-      const token = {
-        id: crypto.randomUUID(),
-        name: character ? baseName : uniqueName(c.tokens, baseName),
-        img,
-        x: camp.clampInt(p.x, -5000, 20000, 0),
-        y: camp.clampInt(p.y, -5000, 20000, 0),
-        size: camp.clampInt(p.size, 1, 6, 1),
-        ownerId: character ? character.ownerId : (p.ownerId && c.playerIds.includes(p.ownerId) ? p.ownerId : null),
-        characterId: character ? character.id : null,
-        hp: camp.clampInt(p.hp, -99, 9999, 10),
-        maxHp: camp.clampInt(p.maxHp, 1, 9999, 10),
-        hidden: dm && p.hidden === true,
-        conditions: [],
-      };
-      c.tokens = [...c.tokens, token];
-      save();
-      emitTokens(c);
-    });
-
-    on('token:update', {}, (c, user, p) => {
-      const dm = camp.isDM(user, c);
-      const prev = c.tokens.find((t) => t.id === p.id);
-      if (!prev) throw new Error('Ficha no encontrada');
-      if (!dm && prev.ownerId !== user.id) throw new Error('Esa ficha no es tuya');
-      const next = {
-        ...prev,
-        x: p.x !== undefined ? camp.clampInt(p.x, -5000, 20000, prev.x) : prev.x,
-        y: p.y !== undefined ? camp.clampInt(p.y, -5000, 20000, prev.y) : prev.y,
-        hp: p.hp !== undefined ? camp.clampInt(p.hp, 0, 9999, prev.hp) : prev.hp,
-        conditions: Array.isArray(p.conditions) ? p.conditions.slice(0, 12).map((x) => camp.cleanText(x, 20)).filter(Boolean) : prev.conditions,
-      };
-      if (dm) {
-        Object.assign(next, {
-          name: p.name !== undefined ? camp.cleanText(p.name, 40, prev.name).trim() || prev.name : prev.name,
-          size: p.size !== undefined ? camp.clampInt(p.size, 1, 6, prev.size) : prev.size,
-          maxHp: p.maxHp !== undefined ? camp.clampInt(p.maxHp, 1, 9999, prev.maxHp) : prev.maxHp,
-          hidden: typeof p.hidden === 'boolean' ? p.hidden : prev.hidden,
-          img: p.img !== undefined ? safeUrl(p.img) || prev.img : prev.img,
-        });
-      }
-      c.tokens = c.tokens.map((t) => (t.id === prev.id ? next : t));
-      save();
-      // Movimiento: se manda solo el delta para que sea fluido; resto: lista entera.
-      if (p.x !== undefined && Object.keys(p).length <= 3 && !next.hidden) {
-        socket.to(c.id).emit('token:moved', { id: next.id, x: next.x, y: next.y });
-      } else {
-        emitTokens(c);
-      }
-      if (prev.hidden !== next.hidden || next.hidden) emitTokens(c);
-    });
-
-    on('token:remove', {}, (c, user, { id }) => {
-      const prev = c.tokens.find((t) => t.id === id);
-      if (!prev) return;
-      if (!camp.isDM(user, c) && prev.ownerId !== user.id) throw new Error('Esa ficha no es tuya');
-      c.tokens = c.tokens.filter((t) => t.id !== id);
-      c.initiative = withoutEntry(c.initiative, id);
-      save();
-      emitTokens(c);
-      io.to(c.id).emit('initiative', c.initiative);
-    });
-
-    on('ping', {}, (c, user, { x, y }) => {
-      io.to(c.id).emit('ping', { x: Number(x) || 0, y: Number(y) || 0, name: user.displayName, userId: user.id });
-    });
-
-    // ---------- iniciativa ----------
-    on('initiative:set', { dmOnly: true }, (c, user, { entries, turn, round }) => {
-      const clean = (Array.isArray(entries) ? entries : []).slice(0, 40).map((e) => ({
-        id: typeof e.id === 'string' ? e.id.slice(0, 40) : crypto.randomUUID(),
-        tokenId: typeof e.tokenId === 'string' ? e.tokenId : null,
-        name: camp.cleanText(e.name, 40, 'Combatiente'),
-        value: camp.clampInt(e.value, -10, 60, 0),
-        img: safeUrl(e.img),
-      }));
-      c.initiative = {
-        entries: clean,
-        turn: camp.clampInt(turn, 0, Math.max(0, clean.length - 1), 0),
-        round: camp.clampInt(round, 1, 999, c.initiative.round || 1),
-      };
-      save();
-      io.to(c.id).emit('initiative', c.initiative);
-    });
+    registerBoard({ io, socket, on, me, myScene, emitScene, emitScenes, emitToScene, emitPlayersMoved });
+    registerObjects({ io, socket, on, myScene, emitScene, emitCharacters });
 
     // ---------- música y sonido (DM) ----------
     const emitMusic = (c) => io.to(c.id).emit('music', { music: c.music, serverNow: Date.now() });
@@ -316,6 +210,9 @@ function setupRealtime(io) {
         hidden: p.hidden === true,
       };
       const targets = p.userId ? [p.userId] : c.playerIds;
+      const now = Date.now();
+      for (const [id, r] of pending) if (now - r.at > REQUEST_TTL_MS) pending.delete(id);
+      pending.set(request.id, { userIds: new Set(targets), at: now });
       for (const sid of io.sockets.adapter.rooms.get(c.id) || []) {
         const sock = io.sockets.sockets.get(sid);
         if (sock && targets.includes(sock.data.userId)) sock.emit('roll:request', request);
@@ -323,15 +220,25 @@ function setupRealtime(io) {
     });
 
     // ---------- chat y tiradas ----------
-    on('chat', {}, (c, user, { text }) => {
-      const msg = camp.cleanText(text, 1000).trim();
+    on('chat', {}, (c, user, p) => {
+      const msg = camp.cleanText(p.text, 1000).trim();
       if (!msg) return;
-      const entry = camp.addLog(c, { type: 'chat', userId: user.id, name: user.displayName, text: msg });
+      const scene = myScene(c, user);
+      const who = camp.speakerFor(user, c, scene, p);
+      // Diálogo: el DM hace hablar a un NPC y sale en un cuadro sobre el tablero de esa escena.
+      const dialog = camp.isDM(user, c) && p.dialog === true && who.as;
+      const entry = camp.addLog(c, { type: 'chat', userId: user.id, ...who, text: msg, ...(dialog ? { dialog: true, sceneId: scene.id } : {}) });
       io.to(c.id).emit('log', entry);
     });
 
     on('roll', {}, (c, user, p) => {
       const dm = camp.isDM(user, c);
+      const req = typeof p.requestId === 'string' && pending.get(p.requestId);
+      const answering = Boolean(req && req.userIds.has(user.id));
+      const scene = myScene(c, user);
+      const gate = sc.rollGate(scene, user.id, { isDM: dm, answeringRequest: answering, useReaction: p.reaction === true, characterId: typeof p.characterId === 'string' ? p.characterId : null });
+      if (!gate.ok) throw new Error(gate.reason);
+      if (answering) req.userIds.delete(user.id);
       let expr = String(p.expr || '1d20');
       const adv = p.mode === 'adv' || p.mode === 'dis';
       if (adv) expr = expr.replace(/^1?d20/i, p.mode === 'adv' ? '2d20kh1' : '2d20kl1');
@@ -341,8 +248,8 @@ function setupRealtime(io) {
       const entry = camp.addLog(c, {
         type: 'roll',
         userId: user.id,
-        name: user.displayName,
-        label: camp.cleanText(p.label, 60, '').trim(),
+        ...camp.speakerFor(user, c, scene, p),
+        label: `${camp.cleanText(p.label, 60, '').trim()}${gate.reactionOf ? ' · reacción' : ''}`.trim(),
         mode: adv ? p.mode : null,
         dc,
         hidden: p.hidden === true,
@@ -352,6 +259,11 @@ function setupRealtime(io) {
         byDM: dm,
       });
       emitLog(c, entry);
+      if (gate.reactionOf) {
+        sc.spend(scene, gate.reactionOf, 'reaction');
+        save();
+        emitScene(c, scene);
+      }
     });
   });
 }

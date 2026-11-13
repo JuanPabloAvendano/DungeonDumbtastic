@@ -1,4 +1,4 @@
-// Arranque y enrutado por hash: #/login, #/ (lobby), #/admin, #/mesa/:id
+// Arranque y enrutado por hash: #/login, #/ (lobby), #/admin, #/mesa/:id, #/mapas (taller)
 import { h, toast, ROLE_LABEL } from './ui.js';
 import { api } from './api.js';
 import { loginView } from './views/login.js';
@@ -6,6 +6,8 @@ import { lobbyView } from './views/lobby.js';
 import { adminView } from './views/admin.js';
 import { tableView } from './views/table.js';
 import { guideView } from './views/guide.js';
+import { studioView } from './views/studio.js';
+import { booksView } from './views/books.js';
 
 const root = document.getElementById('app');
 let me = null;
@@ -22,6 +24,8 @@ function header() {
     h('nav',
       h('a', { href: '#/' }, 'Campañas'),
       h('a', { href: '#/guia' }, 'Guía'),
+      h('a', { href: '#/libros' }, 'Libros'),
+      me.role !== 'player' ? h('a', { href: '#/mapas' }, 'Taller de mapas') : null,
       me.role === 'superadmin' ? h('a', { href: '#/admin' }, 'Administración') : null),
     h('div.user-chip', h('b', me.displayName), h(`span.badge${me.role !== 'player' ? '.gold' : ''}`, ROLE_LABEL[me.role]),
       h('button.btn.small.ghost', {
@@ -60,13 +64,21 @@ async function route() {
     cleanup = tableView(root, { me, go, campaignId: mesa[1] });
     return;
   }
+  // #/mapas (portada), #/mapas/nuevo?desde=<url>&nombre=…, #/mapas/<borrador>
+  const mapas = hash.match(/^#\/mapas(?:\/([\w-]+))?(?:\?(.*))?$/);
+  if (mapas) {
+    cleanup = studioView(root, { me, go, header, route: { id: mapas[1] || null, params: new URLSearchParams(mapas[2] || '') } });
+    return;
+  }
+  if (hash === '#/libros') return booksView(root, { me, header });
   if (hash === '#/admin') {
     if (me.role !== 'superadmin') return go('#/');
     // adminView es asíncrona: su limpieza (parar el monitor) llega al resolverse.
     adminView(root, { me, header }).then((stop) => { cleanup = stop; });
     return;
   }
-  return lobbyView(root, { me, go, header });
+  // lobbyView es asíncrona: su limpieza (cerrar el socket del lobby) llega al resolverse.
+  lobbyView(root, { me, go, header }).then((stop) => { cleanup = stop; });
 }
 
 window.addEventListener('hashchange', route);

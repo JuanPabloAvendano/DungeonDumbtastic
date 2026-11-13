@@ -1,16 +1,35 @@
-// Cliente de la API REST y del socket. Guarda la sesión en localStorage.
+// Cliente de la API REST y del socket.
+// Cada pestaña tiene su propia sesión (sessionStorage): iniciar sesión con otra cuenta en otra
+// pestaña no cambia la identidad de esta. localStorage solo recuerda el último inicio de sesión
+// para que una pestaña nueva arranque ya dentro.
 import { io } from '/socket.io/socket.io.esm.min.js';
 
 const TOKEN_KEY = 'da.token';
+let memoryToken = null;
 
 function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try {
+    const own = sessionStorage.getItem(TOKEN_KEY);
+    if (own) return own;
+    const last = localStorage.getItem(TOKEN_KEY);
+    if (last) sessionStorage.setItem(TOKEN_KEY, last);
+    return last;
+  } catch {
+    return memoryToken;
+  }
 }
 
 function setToken(token) {
+  memoryToken = token;
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    if (token) {
+      sessionStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(TOKEN_KEY, token);
+      return;
+    }
+    // Cerrar sesión: solo olvida la "última sesión" si era la de esta pestaña.
+    if (localStorage.getItem(TOKEN_KEY) === sessionStorage.getItem(TOKEN_KEY)) localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
   } catch { /* modo privado: la sesión dura lo que la pestaña */ }
 }
 

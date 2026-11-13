@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { db, flush } = require('../server/db');
 const auth = require('../server/auth');
 const camp = require('../server/campaigns');
+const scenes = require('../server/scenes');
 
 const G = 70;
 const pass = () => crypto.randomBytes(5).toString('base64url');
@@ -33,7 +34,10 @@ if (!c) {
     { id: crypto.randomUUID(), name: 'Ruinas del bosque', url: '/assets/demo/map-bosque.svg' },
     { id: crypto.randomUUID(), name: 'Cripta olvidada', url: '/assets/demo/map-cripta.svg' },
   ];
-  c.scene = { mapId: c.maps[0].id, gridSize: G, showGrid: true };
+  const scene = Object.assign(c.scenes[0], { name: 'Las ruinas', mapId: c.maps[0].id });
+  // Segunda escena ya preparada (sin lanzar) para probar el flujo de preparar → lanzar.
+  const crypt = Object.assign(scenes.newScene({ name: 'La cripta' }), { mapId: c.maps[1].id });
+  c.scenes.push(crypt);
 
   const sheets = [
     { name: 'Thorin Barbapiedra', race: 'Enano', cls: 'Guerrero', level: 3, ac: 18, hp: 31, maxHp: 31, speed: 25,
@@ -50,12 +54,14 @@ if (!c) {
   sheets.forEach((s, i) => {
     const ch = { id: crypto.randomUUID(), ownerId: players[i].id, campaignId: c.id, ...camp.sanitizeCharacter(s), createdAt: new Date().toISOString() };
     db().characters.push(ch);
-    c.tokens.push({ id: crypto.randomUUID(), name: ch.name, img: ch.portrait, x: spots[i][0] * G, y: spots[i][1] * G,
+    scene.tokens.push({ id: crypto.randomUUID(), name: ch.name, img: ch.portrait, x: spots[i][0] * G, y: spots[i][1] * G,
       size: 1, ownerId: ch.ownerId, characterId: ch.id, hp: ch.hp, maxHp: ch.maxHp, hidden: false, conditions: [] });
   });
   [['Goblin', 'goblin', 7, 6, 4, false], ['Goblin', 'goblin', 7, 8, 3, false], ['Lobo', 'lobo', 11, 5, 3, false], ['Esqueleto', 'esqueleto', 13, 9, 3, true]]
-    .forEach(([name, img, hp, gx, gy, hidden]) => c.tokens.push({ id: crypto.randomUUID(), name, img: `/assets/demo/token-${img}.svg`,
+    .forEach(([name, img, hp, gx, gy, hidden]) => scene.tokens.push({ id: crypto.randomUUID(), name, img: `/assets/demo/token-${img}.svg`,
       x: gx * G, y: gy * G, size: 1, ownerId: null, characterId: null, hp, maxHp: hp, hidden, conditions: [] }));
+  crypt.tokens.push({ id: crypto.randomUUID(), name: 'Esqueleto', img: '/assets/demo/token-esqueleto.svg', x: 8 * G, y: 4 * G,
+    size: 1, ownerId: null, characterId: null, hp: 13, maxHp: 13, hidden: false, conditions: [] });
   camp.addLog(c, { type: 'chat', userId: dm.id, name: dm.displayName, text: 'La niebla cubre las ruinas. Algo se mueve entre los árboles… ¡Tirad Percepción!' });
 }
 flush();

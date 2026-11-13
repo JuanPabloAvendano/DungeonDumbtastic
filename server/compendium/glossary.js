@@ -1,0 +1,56 @@
+// Términos de juego en español → inglés de los libros, para buscar «bola de fuego» o «poción de
+// curación» aunque los libros estén en inglés. Las claves van sin tildes y en minúscula (como normalize).
+const GLOSSARY = {
+  conjuro: ['spell'], conjuros: ['spell'], hechizo: ['spell'], hechizos: ['spell'], truco: ['cantrip'], trucos: ['cantrip'],
+  ritual: ['ritual'], nivel: ['level'], escuela: ['school'], concentracion: ['concentration'],
+  bola: ['ball'], fuego: ['fire', 'flame'], llama: ['flame'], llamas: ['flame'], frio: ['cold'], hielo: ['ice', 'frost'],
+  rayo: ['ray', 'bolt', 'lightning'], relampago: ['lightning'], trueno: ['thunder'], acido: ['acid'], veneno: ['poison'],
+  necrotico: ['necrotic'], radiante: ['radiant'], psiquico: ['psychic'], fuerza: ['force', 'strength'],
+  curar: ['heal', 'cure'], curacion: ['healing', 'cure'], sanar: ['heal'], herida: ['wound'], heridas: ['wounds'],
+  proyectil: ['missile'], proyectiles: ['missile'], misil: ['missile'], magico: ['magic'], magica: ['magic'], magia: ['magic'],
+  escudo: ['shield'], espada: ['sword'], hacha: ['axe'], arco: ['bow'], flecha: ['arrow'], flechas: ['arrow'], daga: ['dagger'],
+  lanza: ['spear'], martillo: ['hammer'], maza: ['mace'], ballesta: ['crossbow'], arma: ['weapon'], armas: ['weapon'],
+  armadura: ['armor'], pocion: ['potion'], pociones: ['potion'], anillo: ['ring'], varita: ['wand'], baston: ['staff'],
+  vara: ['rod'], pergamino: ['scroll'], capa: ['cloak'], botas: ['boots'], guantes: ['gloves', 'gauntlets'], amuleto: ['amulet'],
+  cinturon: ['belt'], yelmo: ['helm'], casco: ['helm'], bolsa: ['bag'], objeto: ['item'], objetos: ['item'], tesoro: ['treasure'],
+  dragon: ['dragon'], rojo: ['red'], azul: ['blue'], verde: ['green'], negro: ['black'], blanco: ['white'], dorado: ['gold'],
+  oro: ['gold'], plateado: ['silver'], plata: ['silver'], bronce: ['bronze'], cobre: ['copper'], laton: ['brass'],
+  muerto: ['dead', 'undead'], muertos: ['undead'], esqueleto: ['skeleton'], zombi: ['zombie'], vampiro: ['vampire'],
+  fantasma: ['ghost'], espectro: ['specter', 'wraith'], lobo: ['wolf'], oso: ['bear'], arana: ['spider'], rata: ['rat'],
+  trasgo: ['goblin'], orco: ['orc'], gigante: ['giant'], demonio: ['demon'], diablo: ['devil'], angel: ['angel'],
+  bestia: ['beast'], bestias: ['beast'], monstruo: ['monster'], criatura: ['creature'], humanoide: ['humanoid'],
+  invocar: ['summon', 'conjure'], conjurar: ['conjure'], invisible: ['invisible'], invisibilidad: ['invisibility'],
+  volar: ['fly'], vuelo: ['flight', 'fly'], teletransporte: ['teleport', 'teleportation'], detectar: ['detect'],
+  luz: ['light'], oscuridad: ['darkness'], dormir: ['sleep'], sueno: ['sleep'], miedo: ['fear'], encantar: ['charm'],
+  paralizar: ['paralyze', 'hold'], sujetar: ['hold'], persona: ['person'], muerte: ['death'], vida: ['life'], tiempo: ['time'],
+  piedra: ['stone'], tierra: ['earth'], agua: ['water'], aire: ['air'], viento: ['wind'], niebla: ['fog', 'mist'], nube: ['cloud'],
+  muro: ['wall'], pared: ['wall'], puerta: ['door'], mano: ['hand'], ojo: ['eye'], revivir: ['revivify', 'resurrection'],
+  resurreccion: ['resurrection'], bendicion: ['bless'], maldicion: ['curse', 'bane'], disipar: ['dispel'],
+  clase: ['class'], guerrero: ['fighter'], mago: ['wizard'], hechicero: ['sorcerer'], brujo: ['warlock'], clerigo: ['cleric'],
+  druida: ['druid'], bardo: ['bard'], paladin: ['paladin'], explorador: ['ranger'], picaro: ['rogue'], barbaro: ['barbarian'],
+  monje: ['monk'], raza: ['race'], enano: ['dwarf'], elfo: ['elf'], mediano: ['halfling'], humano: ['human'], gnomo: ['gnome'],
+  semielfo: ['half-elf'], semiorco: ['half-orc'], draconido: ['dragonborn'], trasfondo: ['background'], dote: ['feat'], dotes: ['feat'],
+  ataque: ['attack'], dano: ['damage'], salvacion: ['saving throw'], tirada: ['roll'], ventaja: ['advantage'],
+  desventaja: ['disadvantage'], agarrado: ['grappled'], derribado: ['prone'], aturdido: ['stunned'], cegado: ['blinded'],
+  envenenado: ['poisoned'], asustado: ['frightened'], hechizado: ['charmed'], paralizado: ['paralyzed'], condicion: ['condition'],
+  descanso: ['rest'], corto: ['short'], largo: ['long'], trampa: ['trap'], trampas: ['trap'], combate: ['combat'],
+  iniciativa: ['initiative'], sorpresa: ['surprise'], cobertura: ['cover'], montura: ['mount'], idiomas: ['languages'],
+  dioses: ['gods', 'deities'], plano: ['plane'], planos: ['planes'], experiencia: ['experience'], desafio: ['challenge'],
+  furia: ['rage'], aliento: ['breath', 'wind'], accion: ['action'], adicional: ['bonus'], reaccion: ['reaction'],
+};
+
+// Frases que en inglés son otra cosa (o van en otro orden): se sustituyen antes de partir en palabras.
+const PHRASES = {
+  'bola de fuego': 'fireball', 'proyectil magico': 'magic missile', 'misil magico': 'magic missile',
+  'curar heridas': 'cure wounds', 'palabra de curacion': 'healing word', 'ataque furtivo': 'sneak attack',
+  'accion subita': 'action surge', 'tomar aliento': 'second wind', 'golpe de suerte': 'stroke of luck',
+  'muro de fuego': 'wall of fire', 'rayo de escarcha': 'ray of frost', 'mano de mago': 'mage hand',
+  'luces danzantes': 'dancing lights', 'ataque de oportunidad': 'opportunity attack', 'tirada de salvacion': 'saving throw',
+  'clase de armadura': 'armor class', 'puntos de golpe': 'hit points', 'dados de golpe': 'hit dice',
+  'vision en la oscuridad': 'darkvision', 'no muerto': 'undead', 'no muertos': 'undead', 'piel robliza': 'barkskin',
+  'paso brumoso': 'misty step', 'flecha acida': 'acid arrow', 'toque gelido': 'chill touch', 'llama sagrada': 'sacred flame',
+  'descarga sobrenatural': 'eldritch blast', 'imagen especular': 'mirror image', 'retirada expeditiva': 'expeditious retreat',
+  'pocion de curacion': 'potion of healing', 'bolsa de contencion': 'bag of holding', 'capa de proteccion': 'cloak of protection',
+};
+
+module.exports = { GLOSSARY, PHRASES };

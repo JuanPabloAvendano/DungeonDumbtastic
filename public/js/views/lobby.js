@@ -134,4 +134,8 @@ export async function lobbyView(root, { me, go, header }) {
       h('section', h('h2.section-title', 'Campañas'), campaignsBox),
       h('section', h('h2.section-title', 'Mis personajes'), charsBox))));
   load();
+  // Tiempo real: si el DM te añade a una campaña o cambian tus personajes, el lobby se actualiza solo.
+  const socket = api.socket();
+  socket.on('lobby:refresh', () => load());
+  return () => socket.disconnect();
 }

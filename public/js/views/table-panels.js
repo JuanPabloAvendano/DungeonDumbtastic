@@ -1,13 +1,14 @@
-// Paneles de la mesa: escena, fichas, grupo, jugadores, personaje, bandeja de dados e iniciativa.
+// Paneles de la mesa: fichas, grupo, jugadores, personaje, bandeja de dados e iniciativa.
 import { h, clear, field, toast, modal, confirmDialog, pickImage, mod, signed, ABILITIES } from '../ui.js';
 import { api } from '../api.js';
 import { sheetForm, playSheet, DEMO_PORTRAITS } from '../sheet.js';
+import { OBJECT_LIBRARY } from './objects.js';
 
-const DEMO_MAPS = [
+export const DEMO_MAPS = [
   { name: 'Ruinas del bosque', url: '/assets/demo/map-bosque.svg' },
   { name: 'Cripta olvidada', url: '/assets/demo/map-cripta.svg' },
 ];
-const BESTIARY = [
+export const BESTIARY = [
   { name: 'Goblin', img: '/assets/demo/token-goblin.svg', hp: 7, size: 1 },
   { name: 'Esqueleto', img: '/assets/demo/token-esqueleto.svg', hp: 13, size: 1 },
   { name: 'Lobo', img: '/assets/demo/token-lobo.svg', hp: 11, size: 1 },
@@ -27,47 +28,6 @@ function draggable(data, el) {
   return el;
 }
 
-// ---------------------------------------------------------------- DM: escena
-export function scenePanel(ctx) {
-  const { s } = ctx;
-  const grid = h('input', { type: 'range', min: 30, max: 160, step: 5, value: s.scene.gridSize });
-  const gridOut = h('b', `${s.scene.gridSize}px`);
-  grid.addEventListener('input', () => { gridOut.textContent = `${grid.value}px`; });
-  grid.addEventListener('change', () => ctx.emit('scene:set', { gridSize: Number(grid.value) }));
-  const showGrid = h('input', { type: 'checkbox', checked: s.scene.showGrid, onchange: (e) => ctx.emit('scene:set', { showGrid: e.target.checked }) });
-
-  const missingDemos = DEMO_MAPS.filter((d) => !s.maps.some((m) => m.url === d.url));
-  return h('div.panel',
-    h('div.label-mini', 'Mapas de la campaña'),
-    s.maps.length ? h('div.map-list', s.maps.map((m) => h(`div.map-item${m.id === s.scene.mapId ? '.active' : ''}`,
-      { onclick: () => ctx.emit('scene:set', { mapId: m.id }), title: 'Mostrar a todos' },
-      h('div.map-thumb', { style: { backgroundImage: `url("${m.url}")` } }),
-      h('span', m.name),
-      h('button.icon-btn.small', {
-        title: 'Quitar mapa',
-        onclick: async (e) => {
-          e.stopPropagation();
-          if (await confirmDialog(`¿Quitar el mapa "${m.name}"?`)) ctx.emit('map:remove', { id: m.id });
-        },
-      }, '✕')))) : h('p.muted.tiny', 'Sin mapas. Sube uno o usa los de ejemplo.'),
-    h('div.col',
-      h('button.btn.primary', {
-        onclick: async () => {
-          const url = await pickImage(api);
-          if (!url) return;
-          const name = prompt('Nombre del mapa:', 'Nuevo mapa') || 'Mapa';
-          ctx.emit('map:add', { name, url });
-        },
-      }, '⬆ Subir mapa'),
-      missingDemos.length ? h('button.btn.ghost', {
-        onclick: () => missingDemos.forEach((d) => ctx.emit('map:add', d)),
-      }, '✦ Añadir mapas de ejemplo') : null),
-    h('div.label-mini', 'Cuadrícula'),
-    h('label.check', showGrid, h('span', 'Mostrar cuadrícula')),
-    h('div.range-row', grid, gridOut),
-    h('p.tiny.muted', 'Ajusta el tamaño de la casilla para que coincida con el dibujo del mapa.'));
-}
-
 // ---------------------------------------------------------------- DM: fichas
 export function tokensPanel(ctx) {
   const { s } = ctx;
@@ -76,19 +36,36 @@ export function tokensPanel(ctx) {
     const p = ctx.board.center();
     ctx.emit('token:add', { ...data, x: p.x, y: p.y, hidden: ctx.prefs.placeHidden });
   };
-  const onBoard = new Set(s.tokens.map((t) => t.characterId).filter(Boolean));
+  const placedToken = (chId) => s.tokens.find((t) => t.characterId === chId);
+  const lost = ctx.board.lostTokens(s.tokens);
+  const pcs = s.characters.filter((ch) => !ch.npc);
+  const npcs = s.characters.filter((ch) => ch.npc);
+  const characterItem = (ch, { onEdit } = {}) => draggable({ characterId: ch.id }, h(`div.lib-item${placedToken(ch.id) ? '.placed' : ''}`, {
+    onclick: () => (placedToken(ch.id) ? ctx.recallTokens([placedToken(ch.id)]) : place({ characterId: ch.id })),
+    title: placedToken(ch.id) ? 'Ya está en el mapa · clic: traerla al centro' : 'Colocar',
+  },
+  h('img', { src: ch.portrait || DEMO_PORTRAITS[0], alt: '' }), h('span', ch.name),
+  onEdit ? h('button.lib-del', { title: 'Editar hoja', onclick: (e) => { e.stopPropagation(); onEdit(); } }, '✎') : null));
 
   return h('div.panel',
-    h('p.tiny.muted', 'Clic para colocar en el centro, o arrastra al mapa.'),
+    lost.length ? h('div.lost-box',
+      h('strong', `⚠ ${lost.length === 1 ? '1 ficha está' : `${lost.length} fichas están`} fuera del mapa y no se ven`),
+      h('div.lost-list', lost.map((t) => h('button.btn.small.ghost', { onclick: () => ctx.recallTokens([t]), title: 'Traer al centro del mapa' }, `📍 ${t.name}`))),
+      lost.length > 1 ? h('button.btn.small.primary', { onclick: () => ctx.recallTokens(lost) }, '📍 Traer todas al centro') : null) : null,
+    h('p.tiny.muted', 'Clic para colocar en el centro, o arrastra al mapa. Si ya está, clic la trae al centro.'),
     h('label.check', hidden, h('span', 'Colocar ocultas (solo las ve el DM)')),
     h('div.label-mini', 'Personajes del grupo'),
-    s.characters.length ? h('div.token-lib', s.characters.map((ch) => draggable({ characterId: ch.id }, h(`div.lib-item${onBoard.has(ch.id) ? '.placed' : ''}`,
-      { onclick: () => place({ characterId: ch.id }), title: onBoard.has(ch.id) ? 'Ya está en el mapa' : 'Colocar' },
-      h('img', { src: ch.portrait || DEMO_PORTRAITS[0], alt: '' }), h('span', ch.name))))) : h('p.muted.tiny', 'Los jugadores aún no han traído personajes.'),
-    h('div.label-mini', 'Bestiario de ejemplo'),
-    h('div.token-lib', BESTIARY.map((b) => draggable({ name: b.name, img: b.img, hp: b.hp, maxHp: b.hp, size: b.size },
-      h('div.lib-item', { onclick: () => place({ name: b.name, img: b.img, hp: b.hp, maxHp: b.hp, size: b.size }) },
-        h('img', { src: b.img, alt: '' }), h('span', b.name), h('small', `${b.hp} PG`))))),
+    pcs.length ? h('div.token-lib', pcs.map((ch) => characterItem(ch))) : h('p.muted.tiny', 'Los jugadores aún no han traído personajes.'),
+    h('div.label-mini', 'NPC (personajes completos)'),
+    npcs.length ? h('div.token-lib', npcs.map((ch) => characterItem(ch, { onEdit: () => openNpcEditor(ctx, ch) }))) : null,
+    h('div.row.wrap',
+      h('button.btn.small', { onclick: () => openNpcEditor(ctx, null) }, '+ Nuevo NPC'),
+      h('button.btn.small.ghost', { onclick: () => openNpcLibrary(ctx) }, '↩ Traer NPC de otra campaña')),
+    h('p.tiny.muted', 'Un NPC tiene hoja completa como un personaje jugador; los jugadores solo ven su nombre, retrato y vida.'),
+    h('div.label-mini', 'Mis bestias'),
+    ctx.bestiary.length ? h('div.token-lib', ctx.bestiary.map((b) => beastItem(b, {
+      onDelete: async () => { if (await confirmDialog(`¿Borrar «${b.name}» de tus bestias? Las fichas ya colocadas se quedan.`)) ctx.deleteBeast(b); },
+    }))) : h('p.muted.tiny', 'Las fichas que subas se guardan aquí para usarlas en cualquier campaña. También puedes guardar una del mapa con ★.'),
     h('button.btn.primary', {
       onclick: async () => {
         const url = await pickImage(api);
@@ -96,15 +73,60 @@ export function tokensPanel(ctx) {
         const name = prompt('Nombre de la ficha:', 'Criatura') || 'Criatura';
         const hp = Number(prompt('Puntos de golpe:', '10')) || 10;
         place({ name, img: url, hp, maxHp: hp, size: 1 });
+        ctx.saveBeast({ name, img: url, hp, size: 1 });
       },
-    }, '⬆ Subir ficha nueva'));
+    }, '⬆ Subir ficha nueva'),
+    h('p.tiny.muted', 'Imagen cuadrada, recomendado 256×256 px.'),
+    h('div.label-mini', 'Objetos (cofres, puertas, cartas…)'),
+    h('div.token-lib', OBJECT_LIBRARY.map((o) => beastItem({ ...o, hp: 1, size: 1, kind: 'objeto' }))),
+    h('p.tiny.muted', 'Un objeto se usa en partida: los jugadores acercan su ficha y lo recogen, abren, leen o activan. Cualquier ficha se convierte en objeto con 📦 en su panel.'),
+    h('div.label-mini', 'Bestiario de ejemplo'),
+    h('div.token-lib', BESTIARY.map((b) => beastItem(b))));
+  /** Criatura de biblioteca: clic la coloca en el centro, se puede arrastrar al mapa y, si es propia, borrar. */
+  function beastItem(b, { onDelete } = {}) {
+    const data = { name: b.name, img: b.img, hp: b.hp, maxHp: b.hp, size: b.size, ...(b.kind === 'objeto' ? { kind: 'objeto', object: b.object } : {}) };
+    return draggable(data, h(`div.lib-item${b.kind === 'objeto' ? '.is-object' : ''}`, { onclick: () => place(data) },
+      h('img', { src: b.img, alt: '' }), h('span', b.name), h('small', b.kind === 'objeto' ? 'objeto' : `${b.hp} PG`),
+      onDelete ? h('button.lib-del', { title: 'Borrar de mis bestias', onclick: (e) => { e.stopPropagation(); onDelete(); } }, '✕') : null));
+  }
+}
+
+/** Crear o editar un NPC con la misma hoja que un personaje jugador. */
+export function openNpcEditor(ctx, ch) {
+  const m = modal(ch ? `Editar NPC · ${ch.name}` : 'Nuevo NPC', sheetForm(ch || null, {
+    onSave: async (data) => {
+      try {
+        if (ch) await api.patch(`/characters/${ch.id}`, data);
+        else await api.post('/characters', { ...data, campaignId: ctx.s.id });
+        m.close();
+        toast('NPC guardado', 'ok');
+      } catch (err) { toast(err.message, 'error'); }
+    },
+  }), { wide: true });
+}
+
+/** NPC del DM que están en otra campaña o sueltos: se pueden traer a esta. */
+function openNpcLibrary(ctx) {
+  const list = h('div.col', h('p.muted.tiny', 'Cargando…'));
+  const dlg = modal('Traer un NPC', list);
+  api.get('/characters').then(({ characters }) => {
+    const free = characters.filter((c) => c.campaignId !== ctx.s.id);
+    clear(list, free.length ? free.map((c) => h('div.list-row',
+      h('img.mini', { src: c.portrait || DEMO_PORTRAITS[0], alt: '' }), h('span.grow', c.name, h('small.muted', ` ${[c.race, c.cls].filter(Boolean).join(' · ')}`)),
+      h('button.btn.small', {
+        onclick: async () => {
+          try { await api.patch(`/characters/${c.id}`, { ...c, campaignId: ctx.s.id }); dlg.close(); } catch (err) { toast(err.message, 'error'); }
+        },
+      }, 'Traer'))) : h('p.muted', 'No tienes NPC en otras campañas.'));
+  }).catch((err) => toast(err.message, 'error'));
 }
 
 // ---------------------------------------------------------------- grupo
 export function partyPanel(ctx) {
   const { s } = ctx;
-  if (!s.characters.length) return h('div.panel', h('p.muted', 'Todavía no hay personajes en esta campaña.'));
-  return h('div.panel', s.characters.map((ch) => {
+  const party = s.characters.filter((ch) => !ch.npc);
+  if (!party.length) return h('div.panel', h('p.muted', 'Todavía no hay personajes en esta campaña.'));
+  return h('div.panel', party.map((ch) => {
     const owner = s.users.find((u) => u.id === ch.ownerId);
     const pct = Math.max(0, Math.min(100, (ch.hp / ch.maxHp) * 100));
     const token = s.tokens.find((t) => t.characterId === ch.id);
@@ -183,37 +205,50 @@ export function characterPanel(ctx) {
     }), { wide: true });
   };
 
-  if (!mine.length) {
+  /** Crear uno nuevo o traer uno de los tuyos que esté en otra campaña (o en ninguna). */
+  const addBox = (title) => {
+    const list = h('div.col');
     api.get('/characters').then(({ characters }) => {
       const free = characters.filter((c) => c.campaignId !== s.id);
-      clear(box,
-        h('p', 'Aún no tienes personaje en esta campaña.'),
-        h('button.btn.primary', { onclick: () => editor(null) }, '+ Crear personaje'),
-        free.length ? [h('div.label-mini', 'O trae uno tuyo'), free.map((c) => h('div.list-row',
-          h('img.mini', { src: c.portrait || DEMO_PORTRAITS[0], alt: '' }), h('span.grow', c.name),
-          h('button.btn.small', {
-            onclick: async () => {
-              try { await api.patch(`/characters/${c.id}`, { ...c, campaignId: s.id }); } catch (err) { toast(err.message, 'error'); }
-            },
-          }, 'Traer')))] : null);
+      clear(list, free.length ? [h('div.label-mini', 'O trae uno tuyo'), free.map((c) => h('div.list-row',
+        h('img.mini', { src: c.portrait || DEMO_PORTRAITS[0], alt: '' }), h('span.grow', c.name),
+        h('button.btn.small', {
+          onclick: async () => {
+            try { await api.patch(`/characters/${c.id}`, { ...c, campaignId: s.id }); } catch (err) { toast(err.message, 'error'); }
+          },
+        }, 'Traer')))] : null);
     }).catch((err) => toast(err.message, 'error'));
+    return h('div.col', title ? h('p', title) : null, h('button.btn.primary', { onclick: () => editor(null) }, '+ Crear personaje'), list);
+  };
+
+  if (!mine.length) {
+    clear(box, addBox('Aún no tienes personaje en esta campaña.'));
     return box;
   }
 
-  const ch = mine[0];
+  const ch = mine.find((x) => x.id === ctx.actingCharacter?.id) || mine[0];
   const token = s.tokens.find((t) => t.characterId === ch.id);
+  const more = h('details.more-chars', h('summary', '+ Llevar otro personaje'));
+  more.addEventListener('toggle', () => { if (more.open && more.children.length === 1) more.append(addBox()); }, { once: false });
   clear(box,
+    mine.length > 1 ? h('div.char-tabs', mine.map((x) => h(`button.char-tab${x.id === ch.id ? '.on' : ''}`, {
+      title: `Actuar como ${x.name}`, onclick: () => ctx.setActAs(`c:${x.id}`),
+    }, h('img', { src: x.portrait || DEMO_PORTRAITS[0], alt: '' }), h('span', x.name)))) : null,
     playSheet(ch, {
       onRoll: (r) => ctx.roll(r),
       onHp: (d) => ctx.changeCharacterHp(ch, d),
+      items: ctx.itemHooks(ch),
     }),
     h('div.row',
-      token
+      token && ctx.board.lostTokens([token]).length
+        ? h('button.btn.primary', { onclick: () => ctx.recallTokens([token]), title: 'Tu ficha quedó fuera del mapa' }, '📍 Traer mi ficha al mapa')
+        : token
         ? h('button.btn.ghost', { onclick: () => ctx.board.focusToken(token.id) }, '◎ Ver mi ficha')
         : h('button.btn.primary', {
           onclick: () => { const p = ctx.board.center(); ctx.emit('token:add', { characterId: ch.id, x: p.x, y: p.y }); },
         }, '⬇ Colocar mi ficha'),
-      h('button.btn.ghost', { onclick: () => editor(ch) }, '✎ Editar hoja')));
+      h('button.btn.ghost', { onclick: () => editor(ch) }, '✎ Editar hoja')),
+    more);
   return box;
 }
 
@@ -233,8 +268,19 @@ export function diceTray(ctx) {
     const m = Number(modInput.value) || 0;
     return parts.length ? parts.join('+') + (m ? signed(m) : '') : '';
   };
+  const countEls = Object.fromEntries(DICE.map((d) => [d, h('span.die-count.hidden')]));
+  const goBtn = h('button.btn.roll', { onclick: () => roll() }, 'TIRAR');
+  const clearBtn = h('button.icon-btn.small.hidden', { title: 'Vaciar selección', onclick: () => { pool = {}; renderPool(); } }, '✕');
   const renderPool = () => {
     const e = expr();
+    const total = Object.values(pool).reduce((a, n) => a + n, 0);
+    DICE.forEach((d) => {
+      countEls[d].textContent = pool[d] ? `×${pool[d]}` : '';
+      countEls[d].classList.toggle('hidden', !pool[d]);
+    });
+    goBtn.textContent = total ? `TIRAR ${total} ${total === 1 ? 'dado' : 'dados'}` : 'TIRAR';
+    goBtn.title = e || 'Elige dados';
+    clearBtn.classList.toggle('hidden', !total);
     clear(poolEl, e ? h('span', e.replace(/\+/g, ' + ')) : h('span.muted', 'Elige dados…'));
   };
   const renderMode = () => clear(modeBtns, [['dis', 'Desv.'], ['normal', 'Normal'], ['adv', 'Ventaja']].map(([k, l]) => h(`button${mode === k ? '.on' : ''}`, {
@@ -258,12 +304,12 @@ export function diceTray(ctx) {
       onclick: () => { pool = { ...pool, [d]: (pool[d] || 0) + 1 }; renderPool(); },
       oncontextmenu: (e) => { e.preventDefault(); pool = { ...pool, [d]: Math.max(0, (pool[d] || 0) - 1) }; renderPool(); },
       title: `d${d} (clic: añadir · clic derecho: quitar)`,
-    }, h('img', { src: `/assets/dice/d${d === 100 ? 10 : d}.svg`, alt: '' }), h('span', `d${d}`)))),
+    }, h('img', { src: `/assets/dice/d${d === 100 ? 10 : d}.svg`, alt: '' }), h('span', `d${d}`), countEls[d]))),
     h('div.tray-mid', poolEl, h('div.row', h('span.tiny.muted', 'Mod.'), modInput, labelInput)),
     h('div.tray-opts', modeBtns,
       ctx.s.isDM ? h('div.row', dcInput, h('label.check.tiny', hiddenInput, h('span', 'Oculta'))) : null),
     h('div.tray-go',
-      h('button.btn.roll', { onclick: () => roll() }, 'TIRAR'),
+      h('div.row', goBtn, clearBtn),
       h('button.btn.small.ghost', { onclick: () => roll(`1d20${signed(Number(modInput.value) || 0)}`) }, 'd20 rápido')));
 }
 
@@ -277,8 +323,8 @@ export function initiativeBar(ctx) {
     return ch ? mod(ch.stats.dex) : 0;
   };
   const rollAll = () => {
-    // Las fichas ocultas no entran: delatarían la emboscada.
-    const entries = s.tokens.filter((t) => !t.hidden).map((t) => {
+    // Las fichas ocultas no entran (delatarían la emboscada) ni los objetos (no actúan).
+    const entries = s.tokens.filter((t) => !t.hidden && t.kind !== 'objeto').map((t) => {
       const ch = t.characterId && s.characters.find((c) => c.id === t.characterId);
       return { id: t.id, tokenId: t.id, name: ch ? ch.name : t.name, img: t.img, value: 1 + Math.floor(Math.random() * 20) + dexOf(t) };
     }).sort((a, b) => b.value - a.value);
@@ -290,20 +336,47 @@ export function initiativeBar(ctx) {
       h('button.btn.small.ghost', { onclick: rollAll }, '⚔ Iniciar combate (tirar iniciativa)')) : h('div.initiative.empty.hidden');
   }
 
-  return h('div.initiative',
-    h('div.round', h('small', 'Ronda'), h('b', ini.round)),
-    h('div.ini-list', ini.entries.map((e, i) => h(`div.ini-item${i === ini.turn ? '.current' : ''}`, {
-      onclick: () => e.tokenId && ctx.board.focusToken(e.tokenId), title: `${e.name} (${e.value})`,
-    }, h('img', { src: e.img || DEMO_PORTRAITS[4], alt: '' }), h('span.ini-val', e.value), h('span.ini-name', e.name)))),
-    s.isDM ? h('div.ini-ctrl',
-      h('button.btn.small', {
-        onclick: () => {
-          const next = ini.turn + 1;
-          set(next >= ini.entries.length ? { turn: 0, round: ini.round + 1 } : { turn: next });
-        },
-      }, 'Siguiente ▶'),
-      h('button.btn.small.ghost', { onclick: rollAll, title: 'Volver a tirar' }, '↻'),
-      h('button.btn.small.ghost', { onclick: () => set({ entries: [], turn: 0, round: 1 }), title: 'Terminar combate' }, '✕')) : null);
+  return h('div.ini-wrap',
+    h('div.initiative',
+      h('div.round', h('small', 'Ronda'), h('b', ini.round)),
+      h('div.ini-list', ini.entries.map((e, i) => h(`div.ini-item${i === ini.turn ? '.current' : ''}${ini.reactions?.[e.tokenId] ? '.reacted' : ''}`, {
+        onclick: () => e.tokenId && ctx.board.focusToken(e.tokenId), title: `${e.name} (${e.value})${ini.reactions?.[e.tokenId] ? ' · reacción gastada' : ''}`,
+      }, h('img', { src: e.img || DEMO_PORTRAITS[4], alt: '' }), h('span.ini-val', e.value), h('span.ini-name', e.name)))),
+      s.isDM ? h('div.ini-ctrl',
+        h('button.btn.small', { onclick: () => ctx.emit('turn:end', {}) }, 'Siguiente ▶'),
+        h('button.btn.small.ghost', { onclick: rollAll, title: 'Volver a tirar' }, '↻'),
+        h('button.btn.small.ghost', { onclick: () => set({ entries: [], turn: 0, round: 1 }), title: 'Terminar combate' }, '✕')) : null),
+    turnStrip(ctx));
+}
+
+/** Economía del turno: movimiento, acción, acción adicional y reacción. */
+function turnStrip(ctx) {
+  const { s, me } = ctx;
+  const ini = s.initiative;
+  const ts = ini.turnState;
+  if (!ts) return null;
+  const current = s.tokens.find((t) => t.id === ts.tokenId);
+  const mine = current?.ownerId === me.id;
+  const canAct = s.isDM || mine;
+  const inIni = (t) => t.ownerId === me.id && ini.entries.some((e) => e.tokenId === t.id);
+  const acting = ctx.actingCharacter;
+  const myToken = s.tokens.find((t) => inIni(t) && t.characterId === acting?.id) || s.tokens.find(inIni);
+  const reactionToken = s.isDM ? current : myToken;
+  const left = Math.max(0, s.scene.moveSquares - ts.used);
+  const chip = (label, used, what, tokenId, enabled) => h(`button.econ${used ? '.used' : ''}`, {
+    disabled: !enabled,
+    title: used ? 'Gastada (clic para devolverla)' : 'Disponible (clic para marcarla como gastada)',
+    onclick: () => ctx.emit('turn:spend', { what, tokenId }),
+  }, h('i'), label);
+  const name = current ? (s.characters.find((c) => c.id === current.characterId)?.name || current.name) : '—';
+
+  return h(`div.turn-strip${mine ? '.mine' : ''}`,
+    h('span.turn-who', mine ? `⚔ Tu turno · ${name}` : `Turno de ${name}`),
+    h(`span.econ.move${left ? '' : '.used'}`, { title: 'Casillas de movimiento que quedan este turno (diagonal = 1)' }, `👣 ${left}/${s.scene.moveSquares}`),
+    chip('Acción', ts.action, 'action', ts.tokenId, canAct),
+    chip('Adicional', ts.bonus, 'bonus', ts.tokenId, canAct),
+    reactionToken ? chip(s.isDM ? 'Reacción' : 'Mi reacción', ini.reactions?.[reactionToken.id], 'reaction', reactionToken.id, true) : null,
+    mine ? h('button.btn.small.primary', { onclick: () => ctx.emit('turn:end', {}) }, 'Terminar turno ▶') : null);
 }
 
 // ---------------------------------------------------------------- DM: música y sonido

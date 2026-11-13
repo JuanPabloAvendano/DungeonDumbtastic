@@ -14,6 +14,10 @@ const EMPTY_DB = {
   sessions: [],
   campaigns: [],
   characters: [],
+  bestiary: [],
+  mapDrafts: [],
+  stamps: [],
+  notes: [],
 };
 
 let state = null;

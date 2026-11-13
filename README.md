@@ -25,6 +25,20 @@ npm run local        # 📶 sin internet: mismo wifi, hotspot del celular o el m
 | **Dungeon Master** | Campañas, jugadores, mapas, fichas, **biblioteca de música** (música, ambiente y efectos sincronizados), iniciativa, pedir tiradas con CD, tiradas y fichas ocultas. |
 | **Jugador** | Su hoja, traerla a una campaña, mover su ficha, tirar desde la hoja, chat, volumen propio. |
 
+## Cuentas de esta instalación
+
+Contraseñas puestas el 2026-11-05 (en `data/` solo se guarda su hash: si se pierden, se cambian desde **Administración**).
+
+| Usuario | Contraseña | Rol | Nombre en la mesa |
+|---|---|---|---|
+| `admin` | `sG_VBVJR` | Super Admin | Super Admin |
+| `dm` | `Xwr7jirg` | Dungeon Master | El Narrador |
+| `jugador1` | `ESmXqIF8` | Jugador | Thorin |
+| `jugador2` | `whDDXijP` | Jugador | Lyra |
+| `jugador3` | `EFaYBqzv` | Jugador | Sombra |
+
+La cuenta `xddd` (nine) es de un jugador real y su contraseña no se guarda aquí.
+
 ## Monitorización y logs
 
 - **Monitor** (Administración): conexiones, quién está en cada mesa, memoria, carga, contadores (peticiones, tiradas, mensajes, subidas, errores) y eventos recientes filtrables. Se refresca cada 5 s.
@@ -33,7 +47,7 @@ npm run local        # 📶 sin internet: mismo wifi, hotspot del celular o el m
 
 ## Jugar sin navegador (pruebas y agentes)
 
-`node scripts/bot.js --url http://localhost:3000 --user dm --pass … state|log|wait|say|roll|move|hp|add|scene|ini|request …` (ayuda en la cabecera del archivo). `DATA_DIR=/otra/carpeta PORT=3100 npm start` levanta una instancia aislada.
+`node scripts/bot.js --url http://localhost:3000 --user dm --pass … state|log|wait|say|roll|move|end|hp|add|scene|ini|request …` (ayuda en la cabecera del archivo). `DATA_DIR=/otra/carpeta PORT=3100 npm start` levanta una instancia aislada.
 
 ## Estructura
 

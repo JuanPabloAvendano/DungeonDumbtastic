@@ -5,14 +5,15 @@
 //   log [n] [--since ISO]         últimas entradas de tiradas y chat
 //   wait <seg> [--since ISO]      espera a que aparezca algo nuevo en el registro
 //   say "<texto>"                 chat
-//   roll "<expr>" ["etiqueta"] [--dc N] [--adv|--dis] [--hidden]
+//   roll "<expr>" ["etiqueta"] [--dc N] [--adv|--dis] [--hidden] [--reaction]
 //   move "<ficha>" <col> <fila>   mover ficha (por nombre o id) a una casilla
 //   hp "<ficha>" <delta>          sumar/restar PG (personajes o criaturas)
 //   cond "<ficha>" "<condición>"  alternar condición
 //   add "<nombre>" <img> <col> <fila> [--hp N] [--hidden]   (DM) img: goblin|lobo|esqueleto|...
 //   remove "<ficha>"              (DM)
 //   reveal "<ficha>"              (DM) mostrar/ocultar
-//   scene "<mapa>"                (DM) cambiar de mapa
+//   scene "<escena>"              (DM) lanzar una escena preparada para todos
+//   end                           terminar tu turno (en combate)
 //   ini roll|next|clear           (DM) iniciativa
 //   request <car> <CD> "<prueba>" [--to usuario]   (DM) pedir tirada: car = str|dex|con|int|wis|cha
 const { io } = require('socket.io-client');
@@ -74,9 +75,10 @@ function findToken(state, ref) {
 }
 
 function printState(state, online) {
-  const g = state.scene.gridSize;
+  const g = state.scene.grid.size;
   const map = state.maps.find((m) => m.id === state.scene.mapId);
-  console.log(`Campaña: ${state.name} · Mapa: ${map?.name || '(ninguno)'} · casilla ${g}px · ${state.isDM ? 'eres DM' : 'eres jugador'}`);
+  console.log(`Campaña: ${state.name} · Escena: ${state.scene.name} · Mapa: ${map?.name || '(ninguno)'} · casilla ${g}px · ${state.isDM ? 'eres DM' : 'eres jugador'}`);
+  if (state.scenes) console.log(`Escenas: ${state.scenes.map((s) => `${s.active ? '★' : ''}${s.name} (${s.players.length} jug.)`).join(' · ')}`);
   console.log(`Conectados: ${state.users.filter((u) => online.includes(u.id)).map((u) => u.displayName).join(', ') || '—'}`);
   console.log('Fichas (col,fila):');
   for (const t of state.tokens) {
@@ -87,6 +89,8 @@ function printState(state, online) {
   const ini = state.initiative;
   if (ini.entries.length) {
     console.log(`Iniciativa (ronda ${ini.round}): ${ini.entries.map((e, i) => `${i === ini.turn ? '▶' : ''}${e.name} ${e.value}`).join(' · ')}`);
+    const ts = ini.turnState;
+    if (ts) console.log(`Turno: movimiento ${ts.used}/${state.scene.moveSquares} casillas · acción ${ts.action ? 'gastada' : 'libre'} · adicional ${ts.bonus ? 'gastada' : 'libre'}`);
   }
   console.log('Personajes:');
   for (const c of state.characters) {
@@ -118,7 +122,7 @@ async function main() {
   const joined = await emit('join', { id: campaign.id });
   if (joined.error) die(joined.error);
   const state = joined.state;
-  const g = state.scene.gridSize;
+  const g = state.scene.grid.size;
   const ok = (r, msg) => (r.error ? die(r.error) : console.log(msg || 'OK'));
 
   switch (cmd) {
@@ -147,7 +151,7 @@ async function main() {
     case 'say': ok(await emit('chat', { text: args.join(' ') }), 'mensaje enviado'); break;
     case 'roll': {
       const mode = flags.adv ? 'adv' : flags.dis ? 'dis' : 'normal';
-      const r = await emit('roll', { expr: args[0], label: args[1] || '', dc: flags.dc || null, mode, hidden: flags.hidden === true });
+      const r = await emit('roll', { expr: args[0], label: args[1] || '', dc: flags.dc || null, mode, hidden: flags.hidden === true, reaction: flags.reaction === true });
       if (r.error) die(r.error);
       await new Promise((res) => setTimeout(res, 300));
       const after = (await emit('refresh', null)).state;
@@ -157,7 +161,7 @@ async function main() {
     }
     case 'move': {
       const t = findToken(state, args[0]);
-      ok(await emit('token:update', { id: t.id, x: Number(args[1]) * g, y: Number(args[2]) * g }), `movida a (${args[1]},${args[2]})`);
+      ok(await emit('token:update', { id: t.id, x: Number(args[1]) * g + state.scene.grid.ox, y: Number(args[2]) * g + state.scene.grid.oy, final: true }), `movida a (${args[1]},${args[2]})`);
       break;
     }
     case 'hp': {
@@ -191,19 +195,16 @@ async function main() {
     case 'remove': ok(await emit('token:remove', { id: findToken(state, args[0]).id })); break;
     case 'reveal': { const t = findToken(state, args[0]); ok(await emit('token:update', { id: t.id, hidden: !t.hidden }), t.hidden ? 'revelada' : 'oculta'); break; }
     case 'scene': {
-      const m = state.maps.find((x) => x.name.toLowerCase().startsWith(String(args[0]).toLowerCase())) || die('mapa no encontrado');
-      ok(await emit('scene:set', { mapId: m.id }), `escena: ${m.name}`);
+      const q = String(args[0]).toLowerCase();
+      const target = (state.scenes || []).find((x) => x.name.toLowerCase().startsWith(q)) || die('escena no encontrada');
+      ok(await emit('scene:launch', { id: target.id }), `escena lanzada: ${target.name}`);
       break;
     }
+    case 'end': ok(await emit('turn:end', {}), 'turno terminado'); break;
     case 'ini': {
       const ini = state.initiative;
       if (args[0] === 'clear') { ok(await emit('initiative:set', { entries: [], turn: 0, round: 1 })); break; }
-      if (args[0] === 'next') {
-        const next = ini.turn + 1;
-        const patch = next >= ini.entries.length ? { turn: 0, round: ini.round + 1 } : { turn: next };
-        ok(await emit('initiative:set', { ...ini, ...patch }), `turno de ${ini.entries[patch.turn]?.name} (ronda ${patch.round || ini.round})`);
-        break;
-      }
+      if (args[0] === 'next') { ok(await emit('turn:end', {}), 'siguiente turno'); break; }
       const dex = (t) => { const c = t.characterId && state.characters.find((x) => x.id === t.characterId); return c ? Math.floor((c.stats.dex - 10) / 2) : 0; };
       const entries = state.tokens.filter((t) => !t.hidden).map((t) => {
         const c = t.characterId && state.characters.find((x) => x.id === t.characterId);
