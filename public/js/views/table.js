@@ -630,7 +630,7 @@ export function tableView(root, { me, go, campaignId }) {
     if (!e) return;
     if (e.type === 'chat') {
       if (live && e.dialog && e.sceneId === s.scene.id) showDialog(e);
-      if (live && shouldSpeak(e, prefs.tts || 'nada', me.id)) {
+      if (live && shouldSpeak(e, prefs.tts || 'nada', me.id, { isDM: s.isDM })) {
         speak(e.text, s.characters.find((ch) => ch.id === e.characterId)?.voice || voiceForName(e.name), prefs.ttsVolume ?? 1);
       }
       return live ? pushTo(chatList, chatEntry(e, me.id), 'chat') : chatList.append(chatEntry(e, me.id));

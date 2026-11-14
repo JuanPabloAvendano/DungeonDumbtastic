@@ -43,3 +43,13 @@ test('una criatura sin hoja suena siempre igual (voz derivada de su nombre)', ()
   const v = voiceForName('Goblin');
   assert.ok(v.pitch >= 0.5 && v.pitch <= 1.6 && v.rate >= 0.8 && v.rate <= 1.25);
 });
+
+test('el DM sí oye a sus propios NPC y criaturas (cuando habla como ellos), pero no a sí mismo', () => {
+  const asNpc = { type: 'chat', text: 'Bienvenidos', userId: 'dm', as: true };
+  const asSelf = { type: 'chat', text: 'pausa para pizza', userId: 'dm' };
+  assert.strictEqual(shouldSpeak(asNpc, 'todo', 'dm', { isDM: true }), true);
+  assert.strictEqual(shouldSpeak(asSelf, 'todo', 'dm', { isDM: true }), false);
+  assert.strictEqual(shouldSpeak({ ...asNpc, dialog: true }, 'dialogos', 'dm', { isDM: true }), true);
+  assert.strictEqual(shouldSpeak(asNpc, 'dialogos', 'dm', { isDM: true }), false, 'en «solo diálogos» sigue haciendo falta el 📜');
+  assert.strictEqual(shouldSpeak({ ...asNpc, userId: 'p1' }, 'todo', 'p1', { isDM: false }), false, 'un jugador no se oye a sí mismo');
+});

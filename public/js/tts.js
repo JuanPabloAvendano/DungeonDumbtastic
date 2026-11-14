@@ -31,9 +31,13 @@ export function speechText(text) {
   return t.replace(/\p{Extended_Pictographic}️?/gu, '').replace(/[«»*_`#]/g, '').replace(/\s+—\s+/g, ', ').replace(/\s+/g, ' ').trim();
 }
 
-/** ¿Se lee esta entrada del chat con el ajuste elegido? Nunca lo que escribe uno mismo. */
-export function shouldSpeak(entry, mode, myId) {
-  if (mode === 'nada' || entry.type !== 'chat' || entry.userId === myId) return false;
+/**
+ * ¿Se lee esta entrada del chat con el ajuste elegido? Lo que escribe uno mismo no, salvo el DM
+ * hablando como un NPC o una criatura (así oye la voz que les puso).
+ */
+export function shouldSpeak(entry, mode, myId, { isDM = false } = {}) {
+  if (mode === 'nada' || entry.type !== 'chat') return false;
+  if (entry.userId === myId && !(isDM && entry.as)) return false;
   return mode === 'todo' || (mode === 'dialogos' && entry.dialog === true);
 }
 
