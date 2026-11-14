@@ -108,7 +108,8 @@ restore() {
   rm -f data/db.sqlite-wal data/db.sqlite-shm
   [[ -f data/db.json ]] && mv data/db.json "data/db.json.migrado-$(date +%s)"
   # Respaldos de antes de SQLite traen db.json: se quita la base local para que se migre desde él.
-  if tar -tzf "$LAST" | grep -qx 'db.json'; then rm -f data/db.sqlite; fi
+  # Sin -q: con pipefail, grep -q corta la tubería, tar muere por SIGPIPE y la condición sale falsa.
+  if tar -tzf "$LAST" | grep -x 'db.json' >/dev/null; then rm -f data/db.sqlite; fi
   tar -xzf "$LAST" -C data
   DATA_DIR="$PWD/data" node --no-warnings -e 'require("./server/db").db()'
   echo "✔ Restaurado en data/ (tu data/ anterior quedó en $keep)"
