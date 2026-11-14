@@ -18,5 +18,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      # pdftotext (texto de los PDF que suben) y qrencode (QR del lanzador local) los usan las pruebas.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils qrencode
       - run: npm ci
       - run: npm test
