@@ -5,7 +5,7 @@ Manda por encima: lo que pida el grupo tras jugar; reglas del SRD 5.1 (CC-BY-4.0
 
 # Progreso · DungeonDumbtastic
 Producto final: mesa virtual completa en el navegador (cuentas y roles, mapas y fichas, hojas con reglas 5e, dados 3D, combate asistido, audio, sesiones por túnel o hotspot, monitorizada)
-Tarea actual: T-3.3
+Tarea actual: T-4.6
 
 ## H1 · Base, cuentas y roles · peso 10
 - [x] T-1.1 · Servidor Express + socket.io con persistencia JSON · peso 3
@@ -35,7 +35,7 @@ Tarea actual: T-3.3
 ## H3 · Dados y tiradas · peso 10
 - [x] T-3.1 · Dados 3D decididos por el servidor, ventaja/desventaja, CD, críticos · peso 4
 - [x] T-3.2 · El DM pide tiradas con CD y tiradas ocultas · peso 2
-- [ ] T-3.3 · Ataque contra CA → daño solo si impacta, ventana de reacción, aplicar daño al objetivo · peso 4
+- [x] T-3.3 · Ataque contra CA → daño solo si impacta, ventana de reacción, aplicar daño al objetivo · peso 4
 
 ## H4 · Hojas y reglas 5e · peso 20
 - [x] T-4.1 · Hoja básica con características, habilidades y salvaciones clicables · peso 3
@@ -51,6 +51,9 @@ Tarea actual: T-3.3
   - [ ] Fichas del bestiario con perfil (hoy solo imagen y PG) e iniciativa con su DES
 - [ ] T-4.5 · Condiciones con duración y concentración · peso 3
 - [ ] T-4.6 · Inventario, botín y PX · peso 3
+  - [x] Inventario con peso, valor, monedas, carga y equipo (CA y ataques automáticos)
+  - [x] Dar objetos y monedas entre personajes y botín del DM
+  - [ ] Puntos de experiencia (PX) y subir de nivel
   - [x] Inventario en la hoja (usar, gastar, soltar en el mapa, pasar a la barra)
   - [x] Objetos del mapa que se recogen, abren (con contenido y cerradura), leen o activan
   - [ ] Monedas, peso y reparto de botín
@@ -87,7 +90,7 @@ Tarea actual: T-3.3
 
 ## H8 · Documentación y pruebas · peso 10
 - [x] T-8.1 · Guías en la app: general, jugador y DM · peso 3
-- [x] T-8.2 · Pruebas unitarias y de integración (55 en verde) · peso 3
+- [x] T-8.2 · Pruebas unitarias y de integración (123 en verde) · peso 3
 - [x] T-8.3 · CLI de juego (scripts/bot.js) y partida de prueba con agentes · peso 2
 - [ ] T-8.4 · Primera sesión real con el grupo y lista de mejoras · peso 2
 

@@ -1,9 +1,11 @@
 node_modules
 .git
+local
+respaldos
+*.log
 data/traductor
 data/logs
 data/db.backup-*
-*.log
-respaldos
+data/db.json*
 data/db.sqlite-wal
 data/db.sqlite-shm

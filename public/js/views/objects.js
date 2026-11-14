@@ -97,7 +97,14 @@ export function openObjectEditor(ctx, t) {
   h('div.grid2', field('Alcance (casillas)', range), h('label.check', locked, h('span', 'Cerrado con llave'))),
   h('div.grid2', field('Prueba para abrirlo', ability), field('CD', dc)),
   h('p.tiny.muted', 'Recoger lo lleva al inventario del personaje; Abrir muestra su contenido (con prueba si está cerrado); Leer enseña el texto solo a quien lo lee; Activar te avisa a ti con tu nota secreta.'),
-  h('button.btn.primary', 'Guardar objeto')), { wide: true });
+  h('div.row.end',
+    h('button.btn.ghost', {
+      type: 'button', title: 'Guardarlo como objeto propio para usarlo en otros mapas, inventarios y botines',
+      onclick: () => import('./templates.js').then(({ openTemplateManager }) => openTemplateManager({
+        start: { ...(t.object?.item || {}), name: t.name, img: t.img, object: { ...t.object, item: undefined } },
+      })),
+    }, '★ Guardar en mis objetos'),
+    h('button.btn.primary', 'Guardar objeto'))), { wide: true });
 }
 
 /** Botones del DM para un objeto: configurarlo, girarlo y volverlo criatura. */

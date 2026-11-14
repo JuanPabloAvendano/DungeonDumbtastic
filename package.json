@@ -6,17 +6,19 @@
   "scripts": {
     "start": "node server/index.js",
     "sesion": "bash scripts/sesion.sh",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js test/*.test.mjs",
     "demo": "node scripts/demo.js",
     "local": "bash scripts/local.sh",
     "bot": "node scripts/bot.js",
     "compendio": "node scripts/compendio.js",
     "respaldo": "bash scripts/respaldo.sh",
-    "nube": "bash scripts/nube.sh"
+    "nube": "bash scripts/nube.sh",
+    "lanzador": "node local/launcher.js"
   },
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "exceljs": "^4.4.0",
     "express": "^4.22.3",
     "multer": "^2.5.0",
     "socket.io": "^4.8.4",
@@ -25,5 +27,8 @@
   "private": true,
   "devDependencies": {
     "socket.io-client": "^4.8.4"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

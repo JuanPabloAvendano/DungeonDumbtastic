@@ -94,6 +94,8 @@ export const api = {
     return (await request('POST', '/upload', form)).url;
   },
   hasToken: () => Boolean(getToken()),
+  /** Para descargas que no pasan por request (archivos con fetch + blob). */
+  token: () => getToken() || '',
   socket() {
     return io({ auth: { token: getToken() }, transports: ['websocket', 'polling'] });
   },

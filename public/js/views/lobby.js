@@ -132,7 +132,10 @@ export async function lobbyView(root, { me, go, header }) {
       h('section.hero',
         h('div', h('h2', `Bienvenido, ${me.displayName}`), h('p.muted', `Tu rol: ${ROLE_LABEL[me.role]}. Llamada por Discord, partida aquí.`))),
       h('section', h('h2.section-title', 'Campañas'), campaignsBox),
-      h('section', h('h2.section-title', 'Mis personajes'), charsBox))));
+      h('section', h('h2.section-title', 'Mis personajes'), charsBox),
+      h('section', h('h2.section-title', 'Mis documentos'),
+        h('p.muted.tiny', 'Tus PDF, notas e imágenes: los consultas siempre y, si eres DM, los compartes con tus jugadores desde la mesa (📄).'),
+        h('button.btn', { onclick: () => import('./documents.js').then((m) => m.openDocumentsLibrary()) }, '📄 Abrir mis documentos')))));
   load();
   // Tiempo real: si el DM te añade a una campaña o cambian tus personajes, el lobby se actualiza solo.
   const socket = api.socket();

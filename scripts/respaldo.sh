@@ -103,7 +103,7 @@ download() {
 restore() {
   local keep="respaldos/data-local-antes-de-restaurar-$(date +%Y-%m-%d-%H%M%S).tar.gz"
   mkdir -p data
-  (cd data && tar -czf "../$keep" --ignore-failed-read $(ls -d db.sqlite db.json uploads compendio 2>/dev/null)) 2>/dev/null || true
+  (cd data && tar -czf "../$keep" --ignore-failed-read $(ls -d db.sqlite db.json uploads compendio docs 2>/dev/null)) 2>/dev/null || true
   # Una base nueva con el WAL viejo al lado se corrompe; y el JSON antiguo ya no se usa.
   rm -f data/db.sqlite-wal data/db.sqlite-shm
   [[ -f data/db.json ]] && mv data/db.json "data/db.json.migrado-$(date +%s)"

@@ -853,10 +853,85 @@ kbd { font: 700 11px var(--font-body); padding: 2px 7px; border-radius: 6px; bac
 .inv-row img { width: 28px; height: 28px; object-fit: contain; border-radius: 4px; }
 .inv-row b { font-size: 13px; }
 .inv-dot { color: var(--gold); width: 28px; text-align: center; }
-.inv-edit { display: grid; grid-template-columns: minmax(0, 1.4fr) 64px minmax(0, 2fr) auto; gap: 6px; }
-@media (max-width: 640px) { .inv-edit { grid-template-columns: minmax(0, 1fr) 64px auto; } .inv-edit input:nth-child(3) { grid-column: 1 / -1; } }
+.inv-edit, .inv-head { display: grid; grid-template-columns: minmax(0, 2fr) 60px minmax(0, 1fr) 70px 80px 28px; gap: 6px; align-items: center; }
+.inv-head { padding: 0 2px; }
+.inv-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line-soft); border-radius: 10px; background: #17121f; }
+.inv-gear { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; }
+.inv-gear .field { margin: 0; }
+@media (max-width: 640px) { .inv-edit { grid-template-columns: minmax(0, 1fr) 60px 28px; } .inv-head { display: none; } }
 .inv-row { flex-wrap: wrap; }
 .inv-row > .row { width: 100%; justify-content: flex-end; }
 .chip.lang { border-color: var(--arcane); }
 .chip.lang.on { color: #fff; background: var(--arcane); border-color: var(--arcane); }
 .cp-lang-note { justify-content: space-between; align-items: center; padding: 4px 8px; border-radius: 8px; background: rgba(143, 107, 255, .1); }
+
+/* Lector para traducir con el navegador (leer.html) */
+.reader-page { overflow: auto; }
+.reader { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+.reader-title { font-size: 2rem; margin: 16px 0 4px; }
+.reader-text { white-space: pre-wrap; line-height: 1.65; margin-top: 20px; font-size: 1.05rem; }
+
+/* Inventario: equipo, monedas y carga */
+.inv-row.equipped { border-color: var(--gold-2); background: linear-gradient(90deg, rgba(227, 191, 106, .08), #17121f 60%); }
+.inv-tag { margin-left: 6px; font-size: 10px; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--gold-2); color: var(--gold); }
+.weapon-row b { color: var(--gold); }
+.coins-edit { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.coins-edit .field { margin: 0; }
+.coins-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
+.coins-row .btn { margin-left: auto; }
+.load-bar { position: relative; height: 20px; border-radius: 99px; background: #120e18; border: 1px solid var(--line-soft); overflow: hidden; margin-top: 8px; }
+.load-bar i { position: absolute; inset: 0 auto 0 0; background: var(--ok); opacity: .35; transition: width .3s var(--ease); }
+.load-bar.warn i { background: var(--warn); opacity: .5; }
+.load-bar.bad i { background: var(--bad); opacity: .55; }
+.load-bar span { position: relative; display: block; text-align: center; font-size: 11px; line-height: 18px; }
+.loot-picks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+/* En el panel estrecho los botones del objeto bajan a su propia fila y se reparten, sin salirse. */
+.inv-row > .row { flex-wrap: wrap; justify-content: flex-start; gap: 4px; flex: 1 1 100%; min-width: 0; }
+.inv-row > .row .btn.small { padding-inline: 8px; }
+
+/* Mis objetos: lista a la izquierda, editor a la derecha */
+.tpl-manager { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; min-height: 420px; }
+.tpl-list { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--line-soft); padding-right: 14px; max-height: 70vh; overflow: auto; }
+.tpl-row { display: flex; gap: 10px; align-items: center; text-align: left; padding: 6px 8px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--text); font: inherit; cursor: pointer; transition: background .15s var(--ease), border-color .15s var(--ease); }
+.tpl-row:hover { background: #1f1829; }
+.tpl-row.active { border-color: var(--gold-2); background: linear-gradient(90deg, rgba(227, 191, 106, .1), transparent); }
+.tpl-row img { width: 34px; height: 34px; object-fit: contain; }
+.tpl-row b { display: block; font-size: 13px; }
+.tpl-row small { font-size: 11px; }
+.tpl-form { display: grid; gap: 10px; }
+.tpl-top { display: flex; gap: 16px; align-items: flex-start; }
+.tpl-pic { align-items: center; gap: 8px; width: 132px; }
+.tpl-img { width: 96px; height: 96px; object-fit: contain; border-radius: 14px; background: radial-gradient(circle, #2a2136, #120e18); border: 1px solid var(--line); padding: 8px; }
+.tpl-stock { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.tpl-stock img { width: 26px; height: 26px; cursor: pointer; opacity: .7; transition: opacity .15s, transform .15s var(--ease); }
+.tpl-stock img:hover { opacity: 1; transform: scale(1.12); }
+@media (max-width: 720px) { .tpl-manager { grid-template-columns: 1fr; } .tpl-list { border-right: 0; padding-right: 0; max-height: 200px; } .tpl-top { flex-direction: column; } }
+
+/* Documentos propios */
+.drawer[data-tab="docs"] .docs-pane { display: flex; }
+.doc-panel { display: flex; flex-direction: column; gap: 10px; padding: 10px; min-height: 0; flex: 1; }
+.doc-panel > .row input[type=search] { flex: 1; min-width: 0; }
+.doc-list { display: flex; flex-direction: column; gap: 6px; overflow: auto; min-height: 0; }
+.doc-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line-soft); border-radius: 10px; background: #17121f; }
+.doc-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; padding: 4px; }
+.doc-open b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-open small { font-size: 11px; }
+.doc-icon { font-size: 22px; }
+.doc-badge { font-size: 10px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.doc-badge.shared { color: var(--ok); border-color: var(--ok); }
+.doc-hit { display: block; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line-soft); background: #17121f; color: var(--text); font: inherit; cursor: pointer; }
+.doc-hit:hover, .doc-row:hover { border-color: var(--gold-2); }
+.doc-hit .tiny { margin-top: 4px; color: var(--muted); }
+.doc-viewer { min-height: 60vh; display: flex; }
+.doc-frame { width: 100%; height: 75vh; border: 0; border-radius: 10px; background: #fff; }
+.doc-image { max-width: 100%; max-height: 75vh; margin: auto; border-radius: 10px; }
+.doc-text { white-space: pre-wrap; width: 100%; max-height: 75vh; overflow: auto; background: var(--bg); padding: 14px; border-radius: 10px; line-height: 1.6; }
+
+/* Importar desde Excel */
+.excel-report { margin-top: 8px; }
+.excel-errors { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow: auto; }
+.excel-error { display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 6px 10px; border-radius: 8px; background: rgba(226, 80, 76, .08); border: 1px solid rgba(226, 80, 76, .35); font-size: 12px; }
+.excel-error b { color: var(--bad); }
+.reaction-clock { color: var(--warn); font-size: 1.1em; }
+/* Las filas de botones de una ventana bajan de línea antes que salirse */
+.modal .row.end { flex-wrap: wrap; }

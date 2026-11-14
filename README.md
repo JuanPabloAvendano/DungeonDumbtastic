@@ -9,10 +9,12 @@ Las guías de uso están dentro de la app: **`/#/guia`** (general, jugador y DM)
 ```bash
 npm install          # solo la primera vez
 npm run demo         # opcional: crea la campaña de ejemplo y cuentas (servidor apagado)
+npm run lanzador     # 🚀 página local para encender la mesa y elegir conexión (LAN, túneles, P2P)
 npm run sesion       # 🌍 por internet: servidor + túnel público de Cloudflare
 npm run local        # 📶 sin internet: mismo wifi, hotspot del celular o el mismo PC
 ```
 
+- `npm run lanzador` abre una página solo en tu PC: enciende la mesa y abre la conexión que quieras (red local con QR, Cloudflare, Pinggy, localtunnel, bore, Tailscale Funnel o Holesail P2P), o «Automático», que prueba túneles hasta que uno funcione. Nada de esto va en la imagen de la nube.
 - `npm run sesion` imprime un enlace `https://….trycloudflare.com`: pásalo por Discord. Cambia en cada sesión.
 - `npm run local` imprime `http://localhost:3000` y la IP de la red (`http://192.168.x.x:3000`) con un QR. Conecta el PC y los móviles al mismo wifi o al hotspot de un celular. Si no carga, abre el puerto 3000 en el cortafuegos (`sudo ufw allow 3000/tcp`).
 - La primera vez el servidor crea la cuenta **admin** y muestra su contraseña en la consola (o `ADMIN_PASSWORD=… npm start`).
@@ -21,7 +23,7 @@ npm run local        # 📶 sin internet: mismo wifi, hotspot del celular o el m
 
 | Rol | Puede |
 |---|---|
-| **Super Admin** | Cuentas, roles, contraseñas, registro abierto/cerrado, **Monitor** del servidor, ver todas las campañas. |
+| **Administrador** | Cuentas, roles, contraseñas, registro abierto/cerrado, **Monitor** del servidor, ver todas las campañas. |
 | **Dungeon Master** | Campañas, jugadores, mapas, fichas, **biblioteca de música** (música, ambiente y efectos sincronizados), iniciativa, pedir tiradas con CD, tiradas y fichas ocultas. |
 | **Jugador** | Su hoja, traerla a una campaña, mover su ficha, tirar desde la hoja, chat, volumen propio. |
 
@@ -31,7 +33,7 @@ Contraseñas puestas el 2026-11-05 (en `data/` solo se guarda su hash: si se pie
 
 | Usuario | Contraseña | Rol | Nombre en la mesa |
 |---|---|---|---|
-| `admin` | `sG_VBVJR` | Super Admin | Super Admin |
+| `admin` | `sG_VBVJR` | Administrador | Administrador |
 | `dm` | `Xwr7jirg` | Dungeon Master | El Narrador |
 | `jugador1` | `ESmXqIF8` | Jugador | Thorin |
 | `jugador2` | `whDDXijP` | Jugador | Lyra |

@@ -232,7 +232,8 @@ test('los NPC del DM tienen hoja completa, pero los jugadores solo ven nombre, r
   const placed = nextEvent(pl.socket, 'scene:state');
   await dm.emit('token:add', { characterId: body.character.id, x: pc.x, y: pc.y });
   const seen = (await placed).characters.find((c) => c.id === body.character.id);
-  assert.deepStrictEqual(Object.keys(seen).sort(), ['campaignId', 'hp', 'id', 'maxHp', 'name', 'npc', 'ownerId', 'portrait']);
+  // La voz va incluida para que los jugadores oigan al NPC con la voz que eligió el DM.
+  assert.deepStrictEqual(Object.keys(seen).sort(), ['campaignId', 'hp', 'id', 'maxHp', 'name', 'npc', 'ownerId', 'portrait', 'voice']);
   assert.ok(pl.state.characters.some((c) => !c.npc && c.stats), 'los personajes de los jugadores no se recortan');
   dm.socket.close();
   pl.socket.close();

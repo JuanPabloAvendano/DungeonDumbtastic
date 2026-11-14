@@ -1,4 +1,4 @@
-// Panel de Super Admin: cuentas, roles, registro abierto y vista de campañas.
+// Panel de administración: cuentas, roles, registro abierto y vista de campañas.
 import { h, clear, field, toast, confirmDialog, ROLE_LABEL } from '../ui.js';
 import { api } from '../api.js';
 
@@ -111,7 +111,7 @@ export async function adminView(root, { me, header }) {
 
   clear(root, h('div.page', header(),
     h('main.lobby',
-      h('section.hero', h('div', h('h2', 'Panel de Super Admin'), h('p.muted', 'Crea cuentas para tus amigos y decide quién es DM.'))),
+      h('section.hero', h('div', h('h2', 'Panel de administración'), h('p.muted', 'Crea cuentas para tus amigos y decide quién es DM.'))),
       h('section.panel-card',
         h('h2.section-title', 'Crear cuenta'),
         h('form.grid4', {

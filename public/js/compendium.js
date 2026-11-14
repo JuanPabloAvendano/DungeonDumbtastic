@@ -33,7 +33,8 @@ function metaLine(r, es) {
 }
 
 /** Junta las líneas cortadas del PDF dentro de un párrafo (si la siguiente sigue la frase). */
-const reflow = (text) => text.replace(/([^\n.:])\n(?=[a-z0-9(,])/g, '$1 ').replace(/-\n(?=[a-z])/g, '');
+/** Une las líneas que el PDF partió a mitad de frase. */
+export const reflow = (text) => text.replace(/([^\n.:])\n(?=[a-z0-9(,])/g, '$1 ').replace(/-\n(?=[a-z])/g, '');
 
 /** Marca en el texto las palabras buscadas, sin innerHTML (todo con nodos de texto). */
 function highlighted(text, query) {
@@ -126,6 +127,8 @@ export function compendiumPanel({ type = '', level = null, actionsFor = () => []
         h('button.btn.small.ghost', { type: 'button', onclick: () => renderEntry(entry, !showEs) }, es ? 'Ver original' : 'Ver en español')) : null,
       entry.esError ? h('p.tiny.muted', entry.esError) : null,
       buttons.length ? h('div.row.wrap', buttons.map(([label, fn]) => h('button.btn.small.primary', { type: 'button', onclick: fn }, label))) : null,
+      // Página aparte marcada en inglés: el navegador ofrece «Traducir página» (Firefox lo hace sin internet).
+      h('button.btn.small.ghost', { type: 'button', title: 'Abre el original en una pestaña aparte para que el navegador lo traduzca', onclick: () => window.open(`/leer.html?id=${encodeURIComponent(entry.id)}`, '_blank') }, '🌐 Traducir con el navegador'),
       h('div.cp-text', highlighted(es ? entry.es.text : reflow(entry.text), state.q)));
     detail.scrollTop = 0;
   }

@@ -48,7 +48,7 @@ server.listen(PORT, HOST, () => {
   const lan = lanUrls(PORT);
   if (lan.length) console.info(`  📶 En tu red local / hotspot: ${lan.join('  ')}`);
   if (adminPassword) {
-    console.info(`  👑 Super admin creado → usuario: admin  contraseña: ${adminPassword}`);
+    console.info(`  👑 Administrador creado → usuario: admin  contraseña: ${adminPassword}`);
     console.info('     (cámbiala en el panel de administración)\n');
   }
 });

@@ -18,7 +18,7 @@ const GUIDES = {
       h('section.g-sec',
         h('h3', 'Los tres roles'),
         h('div.g-roles',
-          h('div.g-role', h('b', '👑 Super Admin'), h('p', 'Crea las cuentas de los amigos, decide quién es DM, cambia contraseñas, abre o cierra el registro y vigila el servidor (Monitor).')),
+          h('div.g-role', h('b', '👑 Administrador'), h('p', 'Crea las cuentas de los amigos, decide quién es DM, cambia contraseñas, abre o cierra el registro y vigila el servidor (Monitor).')),
           h('div.g-role', h('b', '♛ Dungeon Master'), h('p', 'Crea campañas, invita jugadores, sube mapas, fichas y música, controla la escena, la iniciativa y pide tiradas.')),
           h('div.g-role', h('b', '🛡 Jugador'), h('p', 'Crea su personaje, lo trae a la campaña, mueve su ficha y tira dados con un clic desde su hoja.')))),
       h('section.g-sec',
@@ -41,9 +41,9 @@ const GUIDES = {
             h('p', 'Sin internet: conecta el ordenador y los móviles/portátiles de todos a la misma red (o al hotspot de un celular). La consola muestra la dirección, tipo ', h('code', 'http://192.168.x.x:3000'), '. En el mismo ordenador basta ', h('code', 'http://localhost:3000'), '.'))),
         tip('Si en local nadie puede entrar, revisa el cortafuegos del ordenador (puerto 3000) y que todos estén en la misma red. Algunos hotspots aíslan a los clientes: en ese caso usa el móvil como hotspot y el ordenador como servidor conectado a él.'),
         warn('Mientras el servidor esté abierto, cualquiera con el enlace ve la pantalla de acceso. Cierra el registro en Administración si no lo necesitas.')),
-      // Solo lo ve el super admin: ni DM ni jugadores necesitan (ni deben) ver la administración.
+      // Solo lo ve el administrador: ni DM ni jugadores necesitan (ni deben) ver la administración.
       me?.role === 'superadmin' ? h('section.g-sec',
-        h('h3', 'Para el Super Admin'),
+        h('h3', 'Para el administrador'),
         h('ol.g-steps',
           step('Crear cuentas', h('p', path('Administración', 'Crear cuenta'), ' — usuario, nombre visible, contraseña y rol.')),
           step('Hacer DM a alguien', h('p', path('Administración', 'Cuentas', 'Rol'), ' — cambia el desplegable a ', h('b', 'Dungeon Master'), '.')),

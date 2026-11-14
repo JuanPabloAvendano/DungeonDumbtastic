@@ -120,19 +120,8 @@ SQLite dentro del contenedor (`data/db.sqlite`), el PC baja un respaldo cada 10 
 el respaldo lo detecta, avisa y guarda el último bueno; hay que correr `npm run nube` a mano para volver a
 subirlo (se pierde como mucho lo jugado en los últimos 10 min).
 
-### Documentos propios de cada usuario · 2026-11-13
-Que cualquier usuario suba sus documentos (PDF, notas, manuales caseros) y los use: para sí mismo de forma
-constante (su biblioteca personal) y, si es DM, compartiéndolos en su campaña con sus jugadores. Pensar
-permisos (privado / campaña / jugadores concretos), búsqueda dentro de ellos como en el compendio y dónde
-se guardan en la nube (ligado a «Persistencia de verdad en la nube»).
-
-### Personalización y creación de objetos más dinámica · 2026-11-13
-Crear y personalizar objetos de forma más flexible que la biblioteca de ejemplos actual: editor con
-propiedades libres, imagen propia, efectos y plantillas reutilizables (ver también «Objetos del mapa: lo que queda»).
-
-### Conexión P2P y alternativas de túnel · 2026-11-13
-Hoy, si Cloudflare cae, no hay cómo jugar fuera de la LAN sin desplegar en la nube. Opciones a evaluar:
-- Conexión P2P entre navegadores (WebRTC) para jugar sin servidor público.
-- Varios proveedores de túnel intercambiables, como Cloudflare Tunnel: ngrok, Tailscale Funnel,
-  localtunnel, Pinggy, zrok, bore… con un comando que pruebe el siguiente si uno falla.
-La parte de red y hosting la decide Juan.
+### P2P directo en el navegador (WebRTC) · 2026-11-13
+Ya hecho: lanzador local (`npm run lanzador`) con red local, Cloudflare, Pinggy, localtunnel, bore,
+Tailscale Funnel y Holesail (P2P), y modo automático que prueba túneles. Falta, si hace falta de verdad:
+P2P solo con el navegador (WebRTC), sin instalar nada: el navegador del DM haría de servidor y los
+amigos se conectarían intercambiando un código. Es reescribir la parte de tiempo real; se decide antes de empezar.

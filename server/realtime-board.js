@@ -54,6 +54,8 @@ function buildToken(c, scene, user, p) {
     characterId: character ? character.id : null,
     hp: camp.clampInt(p.hp, -99, 9999, 10),
     maxHp: camp.clampInt(p.maxHp, 1, 9999, 10),
+    // CA de las criaturas sueltas (los personajes usan la de su hoja).
+    ...(character ? {} : { ac: camp.clampInt(p.ac, 0, 40, 10) }),
     hidden: dm && p.hidden === true,
     conditions: [],
     // Solo el DM pone objetos (cofres, cartas, palancas…): no son criaturas ni entran en la iniciativa.
@@ -214,6 +216,7 @@ function registerBoard(rt) {
         name: p.name !== undefined ? camp.cleanText(p.name, 40, prev.name).trim() || prev.name : prev.name,
         size: p.size !== undefined ? camp.clampInt(p.size, 1, 6, prev.size) : prev.size,
         maxHp: p.maxHp !== undefined ? camp.clampInt(p.maxHp, 1, 9999, prev.maxHp) : prev.maxHp,
+        ...(prev.characterId ? {} : { ac: p.ac !== undefined ? camp.clampInt(p.ac, 0, 40, prev.ac ?? 10) : prev.ac ?? 10 }),
         hidden: typeof p.hidden === 'boolean' ? p.hidden : prev.hidden,
         img: p.img !== undefined ? safeUrl(p.img) || prev.img : prev.img,
       });

@@ -102,7 +102,7 @@ export function pickImage(api) {
   });
 }
 
-export const ROLE_LABEL = { player: 'Jugador', dm: 'Dungeon Master', superadmin: 'Super Admin' };
+export const ROLE_LABEL = { player: 'Jugador', dm: 'Dungeon Master', superadmin: 'Administrador' };
 
 export const ABILITIES = [
   ['str', 'FUE', 'Fuerza'], ['dex', 'DES', 'Destreza'], ['con', 'CON', 'Constitución'],

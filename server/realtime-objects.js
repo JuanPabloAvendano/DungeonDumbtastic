@@ -95,7 +95,8 @@ function registerObjects(rt) {
     }
     let reply = { result: o.description || `Es ${t.name}.` };
     if (o.use === 'recoger') {
-      addToInventory(actor.character.id, { name: t.name, note: o.description, qty: 1, img: t.img });
+      // Si el objeto trae datos de inventario (peso, valor, arma…), llegan con él.
+      addToInventory(actor.character.id, obj.cleanItem({ ...(o.item || {}), name: t.name, note: o.item?.note || o.description, qty: 1, img: t.img }));
       scene.tokens = scene.tokens.filter((x) => x.id !== t.id);
       sc.setInitiative(scene, withoutEntry(scene.initiative, t.id));
       reply = { result: `${t.name} va a tu inventario.` };

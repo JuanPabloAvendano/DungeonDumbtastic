@@ -9,7 +9,7 @@ const { snapshot, savedAt, bootSavedAt, DATA_DIR } = require('./db');
 const { log } = require('./logger');
 
 // Lo que hace falta para reconstruir la mesa; quedan fuera logs, copias viejas y los modelos del traductor.
-const FILE_ENTRIES = ['uploads', 'compendio'];
+const FILE_ENTRIES = ['uploads', 'compendio', 'docs'];
 const DB_NAME = 'db.sqlite';
 // Identifica este arranque: si cambia entre dos respaldos, el contenedor se reinició.
 const STARTED_AT = Date.now();

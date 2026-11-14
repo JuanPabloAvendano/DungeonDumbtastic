@@ -5,6 +5,22 @@ const scenes = require('./scenes');
 const fog = require('./fog');
 const actions = require('./actions');
 const objects = require('./objects');
+const { computeAc } = require('../public/js/inventory-rules.js');
+const { VOICE_PRESETS } = require('../public/js/tts.js');
+
+const numIn = (v, min, max, fallback) => (Number.isFinite(Number(v)) ? Math.min(max, Math.max(min, Math.round(Number(v) * 100) / 100)) : fallback);
+
+/** Voz del personaje para leer el chat en voz alta: preajuste, tono, velocidad y voz del equipo. */
+function cleanVoice(input, prev = {}) {
+  if (!input || typeof input !== 'object') return prev?.preset ? prev : { preset: 'normal', pitch: 1, rate: 1, name: '' };
+  const preset = VOICE_PRESETS[input.preset] ? input.preset : 'normal';
+  return {
+    preset,
+    pitch: numIn(input.pitch, 0, 2, VOICE_PRESETS[preset].pitch),
+    rate: numIn(input.rate, 0.5, 2, VOICE_PRESETS[preset].rate),
+    name: cleanText(input.name, 100, '').trim(),
+  };
+}
 
 const LOG_LIMIT = 300;
 const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -67,7 +83,7 @@ function charactersOf(campaign) {
 }
 
 // Lo que un jugador ve de un NPC: aspecto y vida (para la barra de la ficha), no su hoja.
-const NPC_PUBLIC = ['id', 'ownerId', 'campaignId', 'name', 'portrait', 'hp', 'maxHp'];
+const NPC_PUBLIC = ['id', 'ownerId', 'campaignId', 'name', 'portrait', 'hp', 'maxHp', 'voice'];
 
 /** Escena que mira este usuario: el DM puede estar mirando (o preparando) otra. */
 function viewedScene(user, campaign, dmViewId) {
@@ -107,7 +123,8 @@ function sceneView(user, campaign, scene) {
   const dm = isDM(user, campaign);
   const { tokens, initiative, ...meta } = scene;
   // De los objetos, el jugador ve su versión pública (sin nota del DM, texto sin leer ni contenido cerrado).
-  const shown = dm ? tokens : playerTokens(campaign, scene).map((t) => (objects.isObject(t) ? { ...t, object: objects.publicObject(t.object) } : t));
+  // A los jugadores no les llega la CA de las criaturas (se enteran al atacar: impacta o falla).
+  const shown = dm ? tokens : playerTokens(campaign, scene).map(({ ac, ...t }) => (objects.isObject(t) ? { ...t, object: objects.publicObject(t.object) } : t));
   return {
     scene: { ...meta, fog: fog.cleanFog(scene.fog) },
     tokens: shown,
@@ -168,13 +185,15 @@ function sanitizeCharacter(input, prev = {}) {
   ABILITIES.forEach((k) => {
     stats[k] = clampInt(input.stats?.[k], 1, 30, stats[k] ?? 10);
   });
-  return {
+  // baseAc: la CA escrita a mano (sin armadura). Clientes viejos solo mandan `ac`.
+  const baseAc = clampInt(input.baseAc ?? input.ac, 0, 40, prev.baseAc ?? prev.ac ?? 10);
+  const next = {
     ...prev,
     name: cleanText(input.name, 40, prev.name || 'Aventurero').trim() || 'Aventurero',
     race: cleanText(input.race, 30, prev.race || ''),
     cls: cleanText(input.cls, 30, prev.cls || ''),
     level: clampInt(input.level, 1, 20, prev.level ?? 1),
-    ac: clampInt(input.ac, 0, 40, prev.ac ?? 10),
+    baseAc,
     hp: clampInt(input.hp, -99, 999, prev.hp ?? 10),
     maxHp: clampInt(input.maxHp, 1, 999, prev.maxHp ?? 10),
     speed: clampInt(input.speed, 0, 200, prev.speed ?? 30),
@@ -184,8 +203,11 @@ function sanitizeCharacter(input, prev = {}) {
     actions: actions.cleanActions(input.actions, prev.actions || []),
     slots: actions.cleanSlots(input.slots, prev.slots || {}),
     inventory: objects.cleanInventory(input.inventory, prev.inventory || []),
+    coins: objects.cleanCoins(input.coins ?? prev.coins),
+    voice: cleanVoice(input.voice, prev.voice),
     stats,
   };
+  return { ...next, ac: computeAc(next)?.ac ?? baseAc };
 }
 
 module.exports = {

@@ -25,6 +25,8 @@ const EMPTY_DB = {
   mapDrafts: [],
   stamps: [],
   notes: [],
+  itemTemplates: [],
+  documents: [],
 };
 
 let state = null;

@@ -8,12 +8,16 @@ const sc = require('./scenes');
 const { log, countEvent } = require('./logger');
 const { registerBoard, uniqueName, withoutEntry, safeUrl } = require('./realtime-board');
 const { registerObjects } = require('./realtime-objects');
+const { registerInventory } = require('./realtime-inventory');
+const { registerAttack } = require('./realtime-attack');
 
 const TRACK_LIMIT = 80;
 const TRACK_KINDS = ['musica', 'ambiente', 'efecto'];
 const REQUEST_TTL_MS = 10 * 60 * 1000;
 
 function setupRealtime(io) {
+  // Ataques esperando la reacción del objetivo (compartido entre conexiones).
+  const pendingAttacks = new Map();
   // Quién está conectado en cada campaña: campaignId -> Map(socketId -> userId)
   const presence = new Map();
 
@@ -143,6 +147,8 @@ function setupRealtime(io) {
 
     registerBoard({ io, socket, on, me, myScene, emitScene, emitScenes, emitToScene, emitPlayersMoved });
     registerObjects({ io, socket, on, myScene, emitScene, emitCharacters });
+    registerInventory({ io, on, emitCharacters });
+    registerAttack({ io, socket, on, myScene, emitScene, emitCharacters, emitLog, pendingAttacks });
 
     // ---------- música y sonido (DM) ----------
     const emitMusic = (c) => io.to(c.id).emit('music', { music: c.music, serverNow: Date.now() });

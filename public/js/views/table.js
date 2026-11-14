@@ -1,5 +1,5 @@
 // La mesa de juego: une tablero, paneles, tiradas, chat, música, dados 3D y tiempo real.
-import { h, clear, toast, modal, confirmDialog, mod, signed, clock, ABILITIES } from '../ui.js';
+import { h, clear, toast, modal, confirmDialog, mod, signed, ABILITIES } from '../ui.js';
 import { api } from '../api.js';
 import { Board } from '../board.js';
 import { DiceOverlay } from '../dice3d.js';
@@ -13,6 +13,12 @@ import { createNotes } from './notes.js';
 import { objectInspector, objectDmControls } from './objects.js';
 import { actionBar, spend, rest } from '../actions.js';
 import { spellToAction, entryToFeature, monsterToCharacter } from '../compendium-convert.js';
+import { findSpeakers, splitMention, uniqueLabels } from '../speakers.js';
+import { openReactionPrompt } from './attack.js';
+import { itemHooksFor, openLootFor } from './table-items.js';
+import { chatEntry, rollEntry } from './log-entries.js';
+import { shouldSpeak, speak, voiceForName } from '../tts.js';
+import { speechSettings } from '../voice-ui.js';
 
 const CONDITIONS = ['Envenenado', 'Aturdido', 'Derribado', 'Asustado', 'Agarrado', 'Invisible', 'Concentrado', 'Bendecido', 'Cegado', 'Paralizado'];
 const PREFS_KEY = 'da.prefs';
@@ -70,10 +76,19 @@ export function tableView(root, { me, go, campaignId }) {
   const rollList = h('div.log.rolls');
   const chatList = h('div.log.chat-log');
   const chatInput = h('input', { placeholder: 'Escribe… (/r 1d20+5 para tirar)', maxlength: 1000 });
-  const speakerSel = h('select.speaker', { title: 'Hablar y tirar como…', onchange: (e) => setActAs(e.target.value) });
+  // Quién habla: se escribe para buscar (o se empieza el mensaje con @nombre).
+  const speakerList = h('datalist', { id: 'speaker-list' });
+  const speakerSel = h('input.speaker', {
+    list: 'speaker-list', placeholder: 'Hablar como… (escribe para buscar)', autocomplete: 'off',
+    title: 'Hablar y tirar como… Escribe parte del nombre, o empieza el mensaje con @nombre',
+    onfocus: (e) => e.target.select(),
+    onchange: (e) => pickSpeaker(e.target.value),
+    onblur: () => renderSpeaker(),
+    onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); pickSpeaker(e.target.value); chatInput.focus(); } },
+  });
   const dialogBtn = h('button.icon-btn.small', { type: 'button', onclick: () => { dialogMode = !dialogMode; renderSpeaker(); } }, '📜');
   const chatForm = h('form.chat', { onsubmit: (e) => { e.preventDefault(); sendChat(); } },
-    h('div.chat-as', speakerSel, dialogBtn), chatInput, h('button.btn.primary', { title: 'Enviar' }, '➤'));
+    h('div.chat-as', speakerSel, speakerList, dialogBtn), chatInput, h('button.btn.primary', { title: 'Enviar' }, '➤'));
   const dialogBox = h('div.npc-dialog.hidden');
   const fogBar = h('div.fog-bar.hidden');
   // Pincel de niebla del DM: null = mover y seleccionar fichas.
@@ -82,7 +97,8 @@ export function tableView(root, { me, go, campaignId }) {
   const rail = h('div.rail');
   const drawerTabs = h('div.dtabs');
   const booksPane = h('div.books-pane');
-  const drawer = h('div.drawer', drawerTabs, rollList, h('div.chat-pane', chatList, chatForm), booksPane);
+  const docsPane = h('div.books-pane.docs-pane');
+  const drawer = h('div.drawer', drawerTabs, rollList, h('div.chat-pane', chatList, chatForm), booksPane, docsPane);
   const right = h('aside.tright', rail, drawer);
   const screen = h('div.table-screen', tbar, h('div.tmain', left, center, right));
   clear(root, screen);
@@ -150,18 +166,8 @@ export function tableView(root, { me, go, campaignId }) {
       }
       if (tokens[0]) board.focusToken(tokens[0].id);
     },
-    /** Acciones del inventario en la hoja: usar, gastar, soltar en el mapa y pasar a la barra. */
-    itemHooks: (ch) => {
-      const save = (inventory) => api.patch(`/characters/${ch.id}`, { ...ch, inventory }).catch((err) => toast(err.message, 'error'));
-      return {
-        use: (it) => socket.emit('chat', { characterId: ch.id, text: `🎒 usa «${it.name}»${it.note ? ` — ${it.note}` : ''}` }),
-        spend: (it) => save(it.qty > 1 ? ch.inventory.map((x) => (x.id === it.id ? { ...x, qty: x.qty - 1 } : x)) : ch.inventory.filter((x) => x.id !== it.id)),
-        drop: (it) => emit('item:drop', { characterId: ch.id, itemId: it.id }),
-        toBar: (it) => api.patch(`/characters/${ch.id}`, {
-          ...ch, actions: [...(ch.actions || []), { id: `a${Date.now().toString(36)}`, name: it.name.slice(0, 40), kind: 'free', note: it.note || '', spellLevel: null }],
-        }).then(() => toast(`«${it.name}» en la barra`, 'ok')).catch((err) => toast(err.message, 'error')),
-      };
-    },
+    /** Acciones del inventario en la hoja (ver table-items.js). */
+    itemHooks: (ch) => itemHooksFor({ ch, s, emit, chat: (p) => socket.emit('chat', p), roll: (r) => ctx.roll(r) }),
     changeCharacterHp: async (ch, delta) => {
       try { await api.patch(`/characters/${ch.id}`, { ...ch, hp: Math.min(ch.maxHp, ch.hp + delta) }); } catch (err) { toast(err.message, 'error'); }
     },
@@ -198,10 +204,20 @@ export function tableView(root, { me, go, campaignId }) {
     applyLayout();
     if (prefs.rightOpen) {
       if (which === 'libros') return openBooks();
+      if (which === 'docs') return openDocs();
       const list = which === 'chat' ? chatList : rollList;
       list.scrollTop = list.scrollHeight;
       if (which === 'chat') chatInput.focus();
     }
+  }
+
+  // ---------- documentos propios ----------
+  let docs = null;
+  async function openDocs() {
+    if (docs) return docs.focus();
+    const { documentsPanel } = await import('./documents.js');
+    docs = documentsPanel({ campaign: { id: s.id, name: s.name, isDM: s.isDM, players: s.users.filter((u) => u.id !== me.id) } });
+    clear(docsPane, docs.el);
   }
 
   // ---------- libros (compendio) ----------
@@ -237,11 +253,12 @@ export function tableView(root, { me, go, campaignId }) {
     const btn = (which, icon, label) => h(`button.rail-btn${prefs.rightOpen && prefs.rightTab === which ? '.on' : ''}`, {
       title: label, onclick: () => openRight(which),
     }, icon, unread[which] ? h('span.unread', unread[which] > 99 ? '99+' : unread[which]) : null);
-    clear(rail, btn('rolls', '🎲', 'Historial de tiradas'), btn('chat', '💬', 'Chat'), btn('libros', '📖', 'Libros: conjuros, monstruos, objetos y reglas'));
+    clear(rail, btn('rolls', '🎲', 'Historial de tiradas'), btn('chat', '💬', 'Chat'), btn('libros', '📖', 'Libros: conjuros, monstruos, objetos y reglas'), btn('docs', '📄', 'Documentos: los tuyos y los que te comparten'));
     clear(drawerTabs,
       h(`button.dtab${prefs.rightTab === 'rolls' ? '.active' : ''}`, { onclick: () => { prefs.rightTab = 'rolls'; applyLayout(); } }, '🎲 Tiradas'),
       h(`button.dtab${prefs.rightTab === 'chat' ? '.active' : ''}`, { onclick: () => { prefs.rightTab = 'chat'; applyLayout(); chatInput.focus(); } }, '💬 Chat'),
       h(`button.dtab${prefs.rightTab === 'libros' ? '.active' : ''}`, { onclick: () => { prefs.rightTab = 'libros'; applyLayout(); openBooks(); } }, '📖 Libros'),
+      h(`button.dtab${prefs.rightTab === 'docs' ? '.active' : ''}`, { onclick: () => { prefs.rightTab = 'docs'; applyLayout(); openDocs(); } }, '📄 Docs'),
       h('button.icon-btn.small', { title: 'Ocultar panel', onclick: () => { prefs.rightOpen = false; applyLayout(); } }, '»'));
   }
 
@@ -272,7 +289,15 @@ export function tableView(root, { me, go, campaignId }) {
     if (!s.isDM) return mine.length ? mine : [['', me.displayName]];
     const npcs = s.characters.filter((ch) => ch.ownerId !== me.id).map((ch) => [`c:${ch.id}`, `${ch.name} (PJ)`]);
     const tokens = s.tokens.filter((t) => !t.characterId).map((t) => [`t:${t.id}`, t.name]);
-    return [['', `${me.displayName} (DM)`], ...mine.map(([v, n]) => [v, `${n} (NPC)`]), ...tokens, ...npcs];
+    return uniqueLabels([['', `${me.displayName} (DM)`], ...mine.map(([v, n]) => [v, `${n} (NPC)`]), ...tokens, ...npcs]);
+  }
+
+  /** Elige quién habla por el texto escrito: la etiqueta exacta o, si no, la mejor coincidencia. */
+  function pickSpeaker(query) {
+    const opts = speakerOptions();
+    const hit = opts.find(([, label]) => label === query) || findSpeakers(opts, query)[0];
+    if (hit) setActAs(hit[0]);
+    else renderSpeaker();
   }
 
   function setActAs(v) {
@@ -288,7 +313,8 @@ export function tableView(root, { me, go, campaignId }) {
     if (!s) return;
     normalizeActAs();
     const opts = speakerOptions();
-    clear(speakerSel, opts.map(([v, label]) => h('option', { value: v, selected: v === actAs }, label)));
+    clear(speakerList, opts.map(([, label]) => h('option', { value: label })));
+    if (document.activeElement !== speakerSel) speakerSel.value = opts.find(([v]) => v === actAs)?.[1] || '';
     speakerSel.classList.toggle('hidden', opts.length < 2);
     const canDialog = s.isDM && actAs !== '';
     dialogBtn.classList.toggle('hidden', !canDialog);
@@ -385,6 +411,8 @@ export function tableView(root, { me, go, campaignId }) {
         title: `${u.displayName}${u.role === 'dm' ? ' (DM)' : ''}${online.includes(u.id) ? ' · conectado' : ''}`,
       }, u.displayName.slice(0, 1).toUpperCase(), u.role === 'dm' ? h('i', '♛') : null))),
       h(`span.badge${s.isDM ? '.gold' : ''}`, s.isDM ? 'Dungeon Master' : 'Jugador'),
+      s.isDM ? h('button.icon-btn', { title: 'Botín: repartir monedas o dar un objeto', onclick: openLoot }, '🎁') : null,
+      s.isDM ? h('button.icon-btn', { title: 'Importar desde Excel: personajes, objetos, escenas y fichas', onclick: () => import('./excel-import.js').then((m) => m.openExcelImport(s.id)) }, '📊') : null,
       h('button.icon-btn', { title: 'Guía de juego', onclick: () => window.open(`#/guia/${s.isDM ? 'dm' : 'jugador'}`, '_blank') }, '❔'),
       h('button.icon-btn', { title: 'Ajustes', onclick: openSettings }, '⚙'));
   }
@@ -559,6 +587,8 @@ export function tableView(root, { me, go, campaignId }) {
         h('button.btn.small.danger', { onclick: () => applyHp(-(Number(amount.value) || 0)) }, 'Daño'),
         amount,
         h('button.btn.small.ok', { onclick: () => applyHp(Number(amount.value) || 0) }, 'Curar')) : null,
+      s.isDM && !ch ? h('label.row.tiny', { title: 'Clase de armadura: los jugadores no la ven; al atacar solo saben si impacta' }, 'CA ',
+        h('input.mod-input', { type: 'number', min: 0, max: 40, value: t.ac ?? 10, onchange: (e) => emit('token:update', { id: t.id, ac: Number(e.target.value) || 0 }) })) : null,
       h('div.conds', CONDITIONS.map((c) => h(`button.cond${(t.conditions || []).includes(c) ? '.on' : ''}`, {
         disabled: !canEdit, onclick: () => toggleCond(c),
       }, c))),
@@ -586,26 +616,6 @@ export function tableView(root, { me, go, campaignId }) {
   }
 
   // ---------- tiradas y chat (separados) ----------
-  function chatEntry(e) {
-    return h(`div.msg${e.userId === me.id ? '.mine' : ''}${e.dialog ? '.dialog' : ''}`,
-      h('div.msg-head', e.img ? h('img.msg-img', { src: e.img, alt: '' }) : null, h('b', e.name),
-        e.as && e.by ? h('span.tiny.muted', `· ${e.by}`) : null, h('span.tiny.muted', clock(e.at))),
-      h('p', e.text));
-  }
-
-  function rollEntry(e) {
-    const r = e.result;
-    const chips = r.groups.flatMap((g) => g.values.map((v, i) => h(`span.die-chip${g.kept[i] ? '' : '.dropped'}${g.sides === 20 && v === 20 ? '.crit' : ''}${g.sides === 20 && v === 1 ? '.fumble' : ''}`,
-      { title: `d${g.sides}` }, v)));
-    return h(`div.roll-card${e.success === true ? '.success' : ''}${e.success === false ? '.fail' : ''}${e.hidden ? '.secret' : ''}`,
-      h('div.roll-total', r.total),
-      h('div.roll-main',
-        h('div.msg-head', h('b', e.name), e.as && e.by ? h('span.tiny.muted', `· ${e.by}`) : null, e.hidden ? h('span.badge.small', 'oculta') : null, h('span.tiny.muted', clock(e.at))),
-        h('div.roll-label', e.label || 'Tirada', e.mode ? h('small', e.mode === 'adv' ? ' · ventaja' : ' · desventaja') : null),
-        h('div.roll-detail', h('code', r.expr), chips, r.modifier ? h('span.mod', signed(r.modifier)) : null),
-        e.dc ? h('div.roll-verdict', `CD ${e.dc} · ${e.natural === 20 ? '¡Crítico!' : e.natural === 1 ? 'Pifia' : e.success ? 'Éxito' : 'Fallo'}`) : null));
-  }
-
   function pushTo(list, node, kind) {
     list.append(node);
     while (list.children.length > LIST_LIMIT) list.firstChild.remove();
@@ -620,7 +630,10 @@ export function tableView(root, { me, go, campaignId }) {
     if (!e) return;
     if (e.type === 'chat') {
       if (live && e.dialog && e.sceneId === s.scene.id) showDialog(e);
-      return live ? pushTo(chatList, chatEntry(e), 'chat') : chatList.append(chatEntry(e));
+      if (live && shouldSpeak(e, prefs.tts || 'nada', me.id)) {
+        speak(e.text, s.characters.find((ch) => ch.id === e.characterId)?.voice || voiceForName(e.name), prefs.ttsVolume ?? 1);
+      }
+      return live ? pushTo(chatList, chatEntry(e, me.id), 'chat') : chatList.append(chatEntry(e, me.id));
     }
     if (!live) return rollList.append(rollEntry(e));
     // La tirada entra al historial cuando el dado ya cayó, para no destripar el resultado.
@@ -629,21 +642,29 @@ export function tableView(root, { me, go, campaignId }) {
   }
 
   function sendChat() {
-    const text = chatInput.value.trim();
+    let text = chatInput.value.trim();
     if (!text) return;
     chatInput.value = '';
+    const mention = splitMention(speakerOptions(), text);
+    if (mention) {
+      setActAs(mention.value);
+      text = mention.text;
+    }
     const m = text.match(/^\/(r|roll|tirar)\s+(\S+)\s*(.*)$/i);
     if (m) return ctx.roll({ expr: m[2], label: m[3] });
     if (/^\/(ayuda|help)$/i.test(text)) {
-      return chatList.append(chatEntry({ type: 'chat', name: 'Ayuda', at: new Date().toISOString(), text: '/r 1d20+5 Ataque · /r 2d6+3 Daño · /r 4d6kh3 (las 3 mejores) · /r 2d20kl1 (desventaja)' }));
+      return chatList.append(chatEntry({ type: 'chat', name: 'Ayuda', at: new Date().toISOString(), text: '/r 1d20+5 Ataque · /r 2d6+3 Daño · /r 4d6kh3 (las 3 mejores) · /r 2d20kl1 (desventaja) · @nombre mensaje → habla como ese personaje' }));
     }
     socket.emit('chat', { text, ...speakerPayload(), dialog: dialogMode });
   }
+
+  const openLoot = () => openLootFor(s, emit);
 
   function openSettings() {
     const big = h('input', { type: 'checkbox', checked: prefs.bigOthers, onchange: (e) => { prefs.bigOthers = e.target.checked; savePrefs(prefs); } });
     modal('Ajustes de la mesa', [
       h('label.check', big, h('span', 'Ver las tiradas de los demás a pantalla completa')),
+      speechSettings(prefs, savePrefs),
       s.isDM ? h('div.col',
         h('div.label-mini', 'Campaña'),
         h('button.btn.ghost', {
@@ -715,6 +736,7 @@ export function tableView(root, { me, go, campaignId }) {
     if (s.isDM) loadBestiary();
     // Si se dejó abierto el panel de libros, se carga ya.
     if (prefs.rightOpen && prefs.rightTab === 'libros') openBooks();
+    if (prefs.rightOpen && prefs.rightTab === 'docs') openDocs();
   });
 
   socket.on('connect', join);
@@ -767,6 +789,7 @@ export function tableView(root, { me, go, campaignId }) {
   socket.on('campaign:removed', ({ id }) => { if (id === campaignId) { toast('El DM te sacó de esta campaña', 'error'); go('#/'); } });
   socket.on('roll:request', (req) => onRollRequest(req));
   socket.on('toast', ({ kind, text }) => toast(text, kind));
+  socket.on('attack:incoming', (attack) => openReactionPrompt(attack, (kind) => emit('attack:react', { id: attack.id, kind })));
 
   return () => {
     music.destroy();

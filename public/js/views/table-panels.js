@@ -3,6 +3,7 @@ import { h, clear, field, toast, modal, confirmDialog, pickImage, mod, signed, A
 import { api } from '../api.js';
 import { sheetForm, playSheet, DEMO_PORTRAITS } from '../sheet.js';
 import { OBJECT_LIBRARY } from './objects.js';
+import { openTemplateManager, loadTemplates, templateToToken } from './templates.js';
 
 export const DEMO_MAPS = [
   { name: 'Ruinas del bosque', url: '/assets/demo/map-bosque.svg' },
@@ -47,6 +48,9 @@ export function tokensPanel(ctx) {
   h('img', { src: ch.portrait || DEMO_PORTRAITS[0], alt: '' }), h('span', ch.name),
   onEdit ? h('button.lib-del', { title: 'Editar hoja', onclick: (e) => { e.stopPropagation(); onEdit(); } }, '✎') : null));
 
+  const myObjects = h('div.token-lib');
+  fillMyObjects();
+
   return h('div.panel',
     lost.length ? h('div.lost-box',
       h('strong', `⚠ ${lost.length === 1 ? '1 ficha está' : `${lost.length} fichas están`} fuera del mapa y no se ven`),
@@ -77,11 +81,21 @@ export function tokensPanel(ctx) {
       },
     }, '⬆ Subir ficha nueva'),
     h('p.tiny.muted', 'Imagen cuadrada, recomendado 256×256 px.'),
+    h('div.label-mini', 'Mis objetos'),
+    myObjects,
+    h('button.btn.small', { onclick: () => openTemplateManager({ onChange: fillMyObjects }) }, '🧰 Crear y editar mis objetos'),
     h('div.label-mini', 'Objetos (cofres, puertas, cartas…)'),
     h('div.token-lib', OBJECT_LIBRARY.map((o) => beastItem({ ...o, hp: 1, size: 1, kind: 'objeto' }))),
     h('p.tiny.muted', 'Un objeto se usa en partida: los jugadores acercan su ficha y lo recogen, abren, leen o activan. Cualquier ficha se convierte en objeto con 📦 en su panel.'),
     h('div.label-mini', 'Bestiario de ejemplo'),
     h('div.token-lib', BESTIARY.map((b) => beastItem(b))));
+  /** Objetos propios: se piden aparte y se pintan cuando llegan. */
+  function fillMyObjects() {
+    loadTemplates(true).then((list) => clear(myObjects, list.length
+      ? list.map((tpl) => beastItem({ ...templateToToken(tpl), hp: 1 }))
+      : h('p.muted.tiny', 'Crea objetos con imagen, peso, valor y función (recoger, abrir, leer…) y colócalos aquí con un clic.')))
+      .catch((err) => toast(err.message, 'error'));
+  }
   /** Criatura de biblioteca: clic la coloca en el centro, se puede arrastrar al mapa y, si es propia, borrar. */
   function beastItem(b, { onDelete } = {}) {
     const data = { name: b.name, img: b.img, hp: b.hp, maxHp: b.hp, size: b.size, ...(b.kind === 'objeto' ? { kind: 'objeto', object: b.object } : {}) };

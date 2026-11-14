@@ -15,6 +15,9 @@ const { registerCompendium } = require('./routes-compendium');
 const { registerNotes } = require('./notes');
 const objects = require('./objects');
 const { registerBackup } = require('./backup');
+const { registerTemplates } = require('./templates');
+const { registerDocuments } = require('./documents');
+const { registerExcel } = require('./excel');
 
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
@@ -374,6 +377,9 @@ function buildRouter(io) {
   registerStudio(r, { io, handle, httpError, dmOnly, logged });
   registerCompendium(r, { handle, httpError, logged });
   registerNotes(r, { handle, httpError, logged });
+  registerTemplates(r, { handle, httpError, logged });
+  registerDocuments(r, { handle, httpError, logged });
+  registerExcel(r, { handle, httpError, logged, io });
 
   // ---------- imágenes ----------
   const receive = (mw, field, tooBig) => (req, res) => {
